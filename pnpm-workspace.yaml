@@ -1,0 +1,14 @@
+allowBuilds:
+  bufferutil: true
+  ccxt: true
+  esbuild: true
+  keccak: true
+  msw: true
+  utf-8-validate: true
+onlyBuiltDependencies:
+  - bufferutil
+  - ccxt
+  - esbuild
+  - keccak
+  - msw
+  - utf-8-validate

@@ -1,6 +1,6 @@
 'use server'
 
-import { fetchQuote, getSupportedExchangeIds } from '@/lib/trading/exchange-adapter'
+import { fetchQuote } from '@/lib/trading/exchange-adapter'
 
 export interface SwapPriceData {
   token: string
@@ -20,11 +20,17 @@ const symbolMap: Record<string, string> = {
   BTC: 'BTC/USDT', ETH: 'ETH/USDT', SOL: 'SOL/USDT', XRP: 'XRP/USDT', ADA: 'ADA/USDT', DOGE: 'DOGE/USDT',
 }
 
+// Curated list of liquid exchanges that reliably quote these pairs without
+// API keys. Querying ccxt's full exchange list (100+) is slow, unreliable
+// (most don't list these exact pairs) and risks rate limits/IP bans across
+// dozens of exchanges at once.
+const PRICE_SOURCE_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin']
+
 export async function fetchSwapPrices(token: string): Promise<SwapPriceData | null> {
   const symbol = symbolMap[token.toUpperCase()]
   if (!symbol) return null
   const results = await Promise.allSettled(
-    getSupportedExchangeIds().map((exchangeId) => fetchQuote(exchangeId, symbol)),
+    PRICE_SOURCE_EXCHANGES.map((exchangeId) => fetchQuote(exchangeId, symbol)),
   )
   const quotes = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
   if (quotes.length < 2) return null
@@ -52,7 +58,7 @@ export async function fetchTokenQuotes(token: string) {
   const symbol = symbolMap[token.toUpperCase()]
   if (!symbol) return []
   const results = await Promise.allSettled(
-    getSupportedExchangeIds().map((exchangeId) => fetchQuote(exchangeId, symbol)),
+    PRICE_SOURCE_EXCHANGES.map((exchangeId) => fetchQuote(exchangeId, symbol)),
   )
   return results.flatMap((result) => {
     if (result.status !== 'fulfilled') return []

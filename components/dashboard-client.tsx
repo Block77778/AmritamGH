@@ -10,6 +10,7 @@ import WalletConnector from './wallet-connector'
 import PriceMonitor from './price-monitor'
 import TransactionHistory from './transaction-history'
 import ArbitrageOpportunities from './arbitrage-opportunities'
+import DexArbitrage from './dex-arbitrage'
 import ExchangeCredentials from './exchange-credentials'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
@@ -31,6 +32,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [loading, setLoading] = useState(true)
   const [selectedToken, setSelectedToken] = useState('BTC')
   const [activeTab, setActiveTab] = useState('overview')
+  const [arbMode, setArbMode] = useState<'cex' | 'dex'>('cex')
 
   // Load initial data
   useEffect(() => {
@@ -175,14 +177,38 @@ export default function DashboardClient({ user }: { user: User }) {
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div>
-                <h2 className="text-3xl font-bold mb-6 text-foreground">Arbitrage <span className="text-primary">Opportunities</span></h2>
-                <ArbitrageOpportunities
-                  token={selectedToken}
-                  prices={prices}
-                  arbitrage={arbitrage}
-                  onTokenChange={setSelectedToken}
-                  credentials={credentials}
-                />
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-3xl font-bold text-foreground">Arbitrage <span className="text-primary">Opportunities</span></h2>
+                  <div className="flex gap-1 bg-[#1a1a1a] rounded-lg p-1">
+                    <button
+                      onClick={() => setArbMode('cex')}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
+                        arbMode === 'cex' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      CEX
+                    </button>
+                    <button
+                      onClick={() => setArbMode('dex')}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
+                        arbMode === 'dex' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      DEX
+                    </button>
+                  </div>
+                </div>
+                {arbMode === 'cex' ? (
+                  <ArbitrageOpportunities
+                    token={selectedToken}
+                    prices={prices}
+                    arbitrage={arbitrage}
+                    onTokenChange={setSelectedToken}
+                    credentials={credentials}
+                  />
+                ) : (
+                  <DexArbitrage />
+                )}
               </div>
               <div>
                 <h2 className="text-3xl font-bold mb-6 text-foreground">Quick <span className="text-primary">Actions</span></h2>

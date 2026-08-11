@@ -20,10 +20,6 @@ const symbolMap: Record<string, string> = {
   BTC: 'BTC/USDT', ETH: 'ETH/USDT', SOL: 'SOL/USDT', XRP: 'XRP/USDT', ADA: 'ADA/USDT', DOGE: 'DOGE/USDT',
 }
 
-// Curated list of liquid exchanges that reliably quote these pairs without
-// API keys. Querying ccxt's full exchange list (100+) is slow, unreliable
-// (most don't list these exact pairs) and risks rate limits/IP bans across
-// dozens of exchanges at once.
 const PRICE_SOURCE_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin']
 
 export async function fetchSwapPrices(token: string): Promise<SwapPriceData | null> {
@@ -34,12 +30,23 @@ export async function fetchSwapPrices(token: string): Promise<SwapPriceData | nu
   )
   const quotes = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
   if (quotes.length < 2) return null
+
+  // Lowest ask = cheapest place to buy. Highest bid = best place to sell.
   const buy = quotes.reduce((best, quote) => quote.ask < best.ask ? quote : best)
   const sell = quotes.reduce((best, quote) => quote.bid > best.bid ? quote : best)
   if (sell.bid <= buy.ask) return null
+
   const spread = sell.bid - buy.ask
-  const feeRate = (buy.takerFee ?? 0.001) + (sell.takerFee ?? 0.001)
-  const profit = spread - spread * feeRate
+
+  // Fees are a percentage of what you actually pay/receive on each leg
+  // (the notional value), not a percentage of the spread itself. A 0.1%
+  // fee on a $63k trade is ~$63, which can easily exceed a thin spread.
+  const buyFeeRate = buy.takerFee ?? 0.001
+  const sellFeeRate = sell.takerFee ?? 0.001
+  const buyFeeCost = buy.ask * buyFeeRate
+  const sellFeeCost = sell.bid * sellFeeRate
+  const profit = spread - buyFeeCost - sellFeeCost
+
   return {
     token: token.toUpperCase(), buyExchange: buy.exchangeId, buyPrice: buy.ask,
     sellExchange: sell.exchangeId, sellPrice: sell.bid, spread,

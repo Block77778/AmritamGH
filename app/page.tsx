@@ -25,9 +25,7 @@ export default async function Home() {
       <nav className="fixed top-0 w-full z-50 border-b border-primary/10 bg-background/70 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-primary/60 flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="text-primary-foreground font-bold text-xl">₿</span>
-            </div>
+            <img src="/logo-header.png" alt="AmritamGH" className="w-12 h-12 rounded-xl shadow-lg shadow-primary/30 object-cover" />
             <div>
               <div className="text-sm font-bold text-primary tracking-widest">AMRITAMGH</div>
               <div className="text-xs text-muted-foreground">ARBITRAGE</div>
@@ -293,9 +291,7 @@ export default async function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-                  <span className="text-primary-foreground text-lg font-bold">₿</span>
-                </div>
+                <img src="/logo-header.png" alt="AmritamGH" className="w-10 h-10 rounded-lg shadow-lg shadow-primary/20 object-cover" />
                 <span className="font-bold text-foreground tracking-wide text-lg">AMRITAMGH</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">

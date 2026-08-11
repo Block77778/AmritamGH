@@ -86,9 +86,7 @@ export default function DashboardClient({ user }: { user: User }) {
       <header className="fixed top-0 w-full z-50 border-b border-[#1a1a1a] bg-background/80 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="text-primary-foreground font-bold">₿</span>
-            </div>
+            <img src="/logo-header.png" alt="AmritamGH" className="w-10 h-10 rounded-lg shadow-lg shadow-primary/20 object-cover" />
             <div>
               <div className="text-xs font-bold text-primary tracking-widest">AMRITAMGH</div>
               <div className="text-xs text-muted-foreground">{user.email}</div>

@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, TrendingUp, Zap, Shield, BarChart3, Lock, Globe, Rocket, ArrowUpRight } from 'lucide-react'
 import { SwapWindow } from '@/components/swap-window'
-import { RealWalletConnector } from '@/components/real-wallet-connector'
 
 export const metadata = {
   title: 'AmritamGH - Enterprise Crypto Arbitrage Trading Platform',
@@ -37,7 +36,6 @@ export default async function Home() {
             <a href="#stats" className="text-xs text-muted-foreground hover:text-primary transition-colors tracking-wider font-medium">STATS</a>
           </div>
           <div className="flex items-center gap-3">
-            <RealWalletConnector />
             <Link href="/sign-in">
               <Button variant="ghost" className="text-xs text-muted-foreground hover:text-foreground tracking-wider font-medium">Sign In</Button>
             </Link>

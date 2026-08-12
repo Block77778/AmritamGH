@@ -12,6 +12,7 @@ import TransactionHistory from './transaction-history'
 import ArbitrageOpportunities from './arbitrage-opportunities'
 import DexArbitrage from './dex-arbitrage'
 import ExchangeCredentials from './exchange-credentials'
+import BotControlPanel from './bot-control-panel'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
@@ -154,7 +155,7 @@ export default function DashboardClient({ user }: { user: User }) {
         {/* Navigation Tabs */}
         <div className="max-w-7xl mx-auto mb-8">
           <div className="flex gap-8 border-b border-[#2a2a2a]">
-            {['overview', 'wallets', 'prices', 'history', 'exchanges'].map((tab) => (
+            {['overview', 'wallets', 'prices', 'history', 'exchanges', 'bot'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -277,6 +278,13 @@ export default function DashboardClient({ user }: { user: User }) {
           )}
 
           {activeTab === 'exchanges' && <ExchangeCredentials />}
+
+          {activeTab === 'bot' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-foreground">Trading <span className="text-primary">Bot</span></h2>
+              <BotControlPanel />
+            </div>
+          )}
         </div>
       </main>
     </div>

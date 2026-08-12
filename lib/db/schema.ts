@@ -163,6 +163,38 @@ export const executionOrders = pgTable('execution_orders', {
   error: text('error'), createdAt: timestamp('created_at').notNull().defaultNow(), updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
 
+export const botConfig = pgTable('bot_config', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  enabled: boolean('enabled').notNull().default(false),
+  dryRun: boolean('dry_run').notNull().default(true),
+  symbols: text('symbols').notNull().default('BTC/USDT,ETH/USDT'), // comma-separated
+  maxAmountPerTrade: numeric('max_amount_per_trade').notNull().default('0.01'),
+  dailyLossCapUsd: numeric('daily_loss_cap_usd').notNull().default('50'),
+  minNetProfitBps: numeric('min_net_profit_bps').notNull().default('15'), // 0.15% minimum after fees
+  cooldownSeconds: numeric('cooldown_seconds').notNull().default('300'),
+  autoDisabledAt: timestamp('auto_disabled_at'),
+  autoDisabledReason: text('auto_disabled_reason'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const botTradeLog = pgTable('bot_trade_log', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  symbol: text('symbol').notNull(),
+  buyExchange: text('buy_exchange').notNull(),
+  sellExchange: text('sell_exchange').notNull(),
+  amount: numeric('amount').notNull(),
+  buyPrice: numeric('buy_price').notNull(),
+  sellPrice: numeric('sell_price').notNull(),
+  netProfit: numeric('net_profit').notNull(),
+  dryRun: boolean('dry_run').notNull(),
+  status: text('status').notNull(), // 'simulated' | 'executed' | 'failed' | 'skipped_cooldown' | 'no_opportunity'
+  error: text('error'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
 export const tradingAuditLog = pgTable('trading_audit_log', {
   id: text('id').primaryKey(), userId: text('user_id').notNull(), event: text('event').notNull(),
   resourceId: text('resource_id'), metadata: text('metadata').notNull().default('{}'), createdAt: timestamp('created_at').notNull().defaultNow(),

@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/trading-bot",
-      "schedule": "*/1 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -1,6 +1,38 @@
 import { betterAuth } from 'better-auth'
 import { pool } from '@/lib/db'
 
+async function sendResetPasswordEmail(to: string, resetUrl: string) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.error('[auth] RESEND_API_KEY is not set — password reset email was not sent')
+    return
+  }
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL ?? 'AmritamGH <onboarding@resend.dev>',
+      to,
+      subject: 'Reset your AmritamGH password',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2>Reset your password</h2>
+          <p>Someone requested a password reset for your AmritamGH account. If this wasn't you, you can safely ignore this email.</p>
+          <p><a href="${resetUrl}" style="display: inline-block; background: #d4af37; color: #000; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Reset Password</a></p>
+          <p style="color: #666; font-size: 12px;">This link expires in 1 hour. If the button doesn't work, copy this URL: ${resetUrl}</p>
+        </div>
+      `,
+    }),
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    console.error('[auth] Resend API error:', response.status, body)
+  }
+}
+
 export const auth = betterAuth({
   database: pool,
   baseURL:
@@ -13,6 +45,10 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendResetPasswordEmail(user.email, url)
+    },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 hour
   },
   trustedOrigins: [
     'http://localhost:3000',
@@ -35,8 +71,6 @@ export const auth = betterAuth({
   ...(process.env.NODE_ENV === 'development'
     ? {
         advanced: {
-          // In dev (v0 preview iframe), force cross-site cookies so the
-          // session cookie is stored by the browser.
           defaultCookieAttributes: {
             sameSite: 'none' as const,
             secure: true,

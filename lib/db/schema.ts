@@ -199,3 +199,56 @@ export const tradingAuditLog = pgTable('trading_audit_log', {
   id: text('id').primaryKey(), userId: text('user_id').notNull(), event: text('event').notNull(),
   resourceId: text('resource_id'), metadata: text('metadata').notNull().default('{}'), createdAt: timestamp('created_at').notNull().defaultNow(),
 })
+
+// --- Additions to existing botConfig table: add these columns ---
+// (merge these fields into your existing botConfig pgTable definition)
+//   candidateSymbols: text('candidate_symbols').notNull().default('BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,ADA/USDT,DOGE/USDT,ZEC/USDT,LTC/USDT,LINK/USDT,DOT/USDT'),
+//   exchangeScanCount: numeric('exchange_scan_count').notNull().default('5'),
+//   windowStartTime: text('window_start_time').notNull().default('00:00'),
+//   windowDurationMinutes: numeric('window_duration_minutes').notNull().default('20'),
+//   maxTradesPerWindow: numeric('max_trades_per_window').notNull().default('5'),
+//   tradesThisWindow: numeric('trades_this_window').notNull().default('0'),
+//   currentWindowStartedAt: timestamp('current_window_started_at'),
+
+// --- Addition to existing botTradeLog table: add this column ---
+//   strategy: text('strategy').notNull().default('arbitrage'), // 'arbitrage' | 'directional'
+
+export const directionalBotConfig = pgTable('directional_bot_config', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  enabled: boolean('enabled').notNull().default(false),
+  dryRun: boolean('dry_run').notNull().default(true),
+  exchangeId: text('exchange_id').notNull().default('binance'),
+  symbols: text('symbols').notNull().default('BTC/USDT,ETH/USDT'),
+  timeframe: text('timeframe').notNull().default('15m'),
+  fastMaPeriod: numeric('fast_ma_period').notNull().default('9'),
+  slowMaPeriod: numeric('slow_ma_period').notNull().default('21'),
+  maxPositionUsd: numeric('max_position_usd').notNull().default('50'),
+  stopLossPercent: numeric('stop_loss_percent').notNull().default('2'),
+  takeProfitPercent: numeric('take_profit_percent').notNull().default('4'),
+  dailyLossCapUsd: numeric('daily_loss_cap_usd').notNull().default('50'),
+  windowStartTime: text('window_start_time').notNull().default('00:00'),
+  windowDurationMinutes: numeric('window_duration_minutes').notNull().default('20'),
+  autoDisabledAt: timestamp('auto_disabled_at'),
+  autoDisabledReason: text('auto_disabled_reason'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const botPositions = pgTable('bot_positions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  exchangeId: text('exchange_id').notNull(),
+  symbol: text('symbol').notNull(),
+  amount: numeric('amount').notNull(),
+  entryPrice: numeric('entry_price').notNull(),
+  stopLossPrice: numeric('stop_loss_price').notNull(),
+  takeProfitPrice: numeric('take_profit_price').notNull(),
+  status: text('status').notNull().default('open'), // 'open' | 'closed'
+  exitPrice: numeric('exit_price'),
+  exitReason: text('exit_reason'), // 'take_profit' | 'stop_loss' | 'signal_reversal'
+  realizedPnl: numeric('realized_pnl'),
+  dryRun: boolean('dry_run').notNull(),
+  openedAt: timestamp('opened_at').notNull().defaultNow(),
+  closedAt: timestamp('closed_at'),
+})

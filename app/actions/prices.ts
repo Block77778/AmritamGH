@@ -77,3 +77,9 @@ export async function fetchTokenQuotes(token: string) {
     }]
   })
 }
+
+export async function scanAllOpportunities() {
+  const tokens = Object.keys(symbolMap)
+  const results = await Promise.all(tokens.map(fetchSwapPrices))
+  return results.filter((result): result is SwapPriceData => result !== null)
+}

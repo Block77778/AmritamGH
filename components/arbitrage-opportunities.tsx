@@ -14,7 +14,7 @@ interface ArbitrageOpportunitiesProps {
   credentials: Array<{ id: string; exchangeId: string; label: string; status: string }>
 }
 
-const POPULAR_TOKENS = ['BTC', 'ETH', 'SOL', 'USDC', 'USDT']
+const POPULAR_TOKENS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN']
 
 export default function ArbitrageOpportunities({
   token,

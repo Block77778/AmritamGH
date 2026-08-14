@@ -1,200 +1,225 @@
 'use client'
 
-import { useState } from 'react'
-import { ExchangePrice, calculateArbitrage } from '@/lib/exchanges'
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { scanAllOpportunities } from '@/app/actions/prices'
+import type { SwapPriceData } from '@/app/actions/prices'
 import { executeOpportunity } from '@/app/actions/trading'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, AlertCircle, TrendingUp } from 'lucide-react'
+import { ArrowRight, AlertCircle, TrendingUp, KeyRound, Loader } from 'lucide-react'
 
 interface ArbitrageOpportunitiesProps {
-  token: string
-  prices: ExchangePrice[]
-  arbitrage: ReturnType<typeof calculateArbitrage> | null
-  onTokenChange: (token: string) => void
   credentials: Array<{ id: string; exchangeId: string; label: string; status: string }>
 }
 
-const POPULAR_TOKENS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN']
+const TICKER_COLORS: Record<string, string> = {
+  BTC: '#f7931a', ETH: '#627eea', SOL: '#14f195', XRP: '#23292f', ADA: '#0033ad', DOGE: '#c2a633',
+  ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a',
+}
 
-export default function ArbitrageOpportunities({
-  token,
-  prices,
-  arbitrage,
-  onTokenChange,
-  credentials,
-}: ArbitrageOpportunitiesProps) {
+export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportunitiesProps) {
+  const [opportunities, setOpportunities] = useState<SwapPriceData[]>([])
+  const [scanning, setScanning] = useState(false)
+  const [lastScanAt, setLastScanAt] = useState<number | null>(null)
+  const [minProfitPercent, setMinProfitPercent] = useState('0.1')
+  const [executingToken, setExecutingToken] = useState<string | null>(null)
   const [amount, setAmount] = useState('1')
-  const [executing, setExecuting] = useState(false)
   const [message, setMessage] = useState('')
 
-  const handleExecute = async () => {
-    if (!arbitrage || !amount) {
-      setMessage('Please fill in all fields')
+  const scan = useCallback(async () => {
+    setScanning(true)
+    try {
+      const results = await scanAllOpportunities()
+      setOpportunities(results.sort((a, b) => b.profitPercentage - a.profitPercentage))
+      setLastScanAt(Date.now())
+    } finally {
+      setScanning(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    scan()
+    const interval = setInterval(scan, 30000)
+    return () => clearInterval(interval)
+  }, [scan])
+
+  const threshold = parseFloat(minProfitPercent) || 0
+  const visible = opportunities.filter((o) => o.profitPercentage >= threshold)
+  const bestSpread = opportunities.length > 0 ? Math.max(...opportunities.map((o) => o.spreadPercentage)) : 0
+
+  const handleExecute = async (opp: SwapPriceData) => {
+    setMessage('')
+    const buyCredential = credentials.find((c) => c.exchangeId === opp.buyExchange)
+    const sellCredential = credentials.find((c) => c.exchangeId === opp.sellExchange)
+    if (!buyCredential || !sellCredential) {
+      const missing = [!buyCredential ? opp.buyExchange : null, !sellCredential ? opp.sellExchange : null].filter(Boolean)
+      setMessage(`Add API keys for ${missing.join(' and ')} in the Exchanges tab before executing ${opp.token}.`)
       return
     }
-
-    setExecuting(true)
-    setMessage('')
-
+    setExecutingToken(opp.token)
     try {
-      const buyCredential = credentials.find((credential) => credential.exchangeId === arbitrage.buyFrom)
-      const sellCredential = credentials.find((credential) => credential.exchangeId === arbitrage.sellTo)
-      if (!buyCredential || !sellCredential) {
-        setMessage('Connect validated trading-only API keys for both exchanges before executing.')
-        return
-      }
       const result = await executeOpportunity({
-        opportunityId: `${token}-${Date.now()}`,
+        opportunityId: `${opp.token}-${Date.now()}`,
         buyCredentialId: buyCredential.id,
         sellCredentialId: sellCredential.id,
-        symbol: `${token}/USDT`,
+        symbol: `${opp.token}/USDT`,
         amount: parseFloat(amount),
-        buyPrice: arbitrage.buyPrice,
-        sellPrice: arbitrage.sellPrice,
+        buyPrice: opp.buyPrice,
+        sellPrice: opp.sellPrice,
       })
-      setMessage(`Live orders submitted: ${result.buyOrderId} / ${result.sellOrderId}`)
-      setAmount('1')
+      setMessage(`${opp.token}: live orders submitted (${result.buyOrderId} / ${result.sellOrderId})`)
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setMessage(`${opp.token}: ${error instanceof Error ? error.message : 'Execution failed'}`)
     } finally {
-      setExecuting(false)
+      setExecutingToken(null)
     }
   }
 
   return (
-    <div className="space-y-8">
-      {/* Token Selector */}
-      <div>
-        <label className="text-xs font-bold text-primary tracking-widest block mb-4">SELECT TOKEN</label>
-        <div className="grid grid-cols-5 gap-2">
-          {POPULAR_TOKENS.map((t) => (
-            <button
-              key={t}
-              onClick={() => onTokenChange(t)}
-              className={`py-3 px-2 rounded-lg font-bold text-sm transition-all ${
-                token === t
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-                  : 'bg-[#1a1a1a] border border-[#2a2a2a] text-muted-foreground hover:border-primary/50'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+    <div className="space-y-6">
+      {/* Stat header */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a]">
+          <div className="text-[10px] text-muted-foreground tracking-widest mb-1">OPPORTUNITIES</div>
+          <div className="text-2xl font-bold text-foreground">{visible.length}</div>
+        </div>
+        <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a]">
+          <div className="text-[10px] text-muted-foreground tracking-widest mb-1">BEST SPREAD</div>
+          <div className="text-2xl font-bold text-primary">{bestSpread.toFixed(2)}%</div>
+        </div>
+        <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a]">
+          <div className="text-[10px] text-muted-foreground tracking-widest mb-1">COINS SCANNED</div>
+          <div className="text-2xl font-bold text-foreground">{opportunities.length}</div>
+        </div>
+        <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a]">
+          <div className="text-[10px] text-muted-foreground tracking-widest mb-1">LAST UPDATE</div>
+          <div className="text-lg font-bold text-foreground">{lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : '—'}</div>
         </div>
       </div>
 
-      {/* Arbitrage Opportunity Display */}
-      {arbitrage ? (
-        <div className="space-y-6">
-          {/* Main Arbitrage Card */}
-          <div className="relative p-8 rounded-xl bg-gradient-to-br from-[#1a1a1a] to-background border border-primary/30 overflow-hidden shadow-lg shadow-primary/20">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-40"></div>
-            <div className="relative space-y-6">
-              {/* Profit Highlight */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-primary font-bold tracking-widest mb-2">PROFIT OPPORTUNITY</div>
-                  <div className="text-5xl font-bold text-primary">{arbitrage.profitPercentage.toFixed(2)}%</div>
-                  <p className="text-sm text-muted-foreground mt-2">per transaction</p>
-                </div>
-                <TrendingUp className="w-16 h-16 text-primary/20" />
-              </div>
-
-              {/* Buy/Sell Flow */}
-              <div className="grid grid-cols-3 gap-4">
-                {/* Buy From */}
-                <div className="p-4 rounded-lg bg-background/50 border border-[#2a2a2a]">
-                  <div className="text-xs text-muted-foreground mb-2">BUY FROM</div>
-                  <div className="text-2xl font-bold text-foreground mb-2">{arbitrage.buyFrom}</div>
-                  <div className="text-lg font-semibold text-primary">${arbitrage.buyPrice.toFixed(2)}</div>
-                </div>
-
-                {/* Arrow */}
-                <div className="flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                    <ArrowRight className="w-6 h-6 text-primary" />
-                  </div>
-                </div>
-
-                {/* Sell To */}
-                <div className="p-4 rounded-lg bg-background/50 border border-[#2a2a2a]">
-                  <div className="text-xs text-muted-foreground mb-2">SELL TO</div>
-                  <div className="text-2xl font-bold text-foreground mb-2">{arbitrage.sellTo}</div>
-                  <div className="text-lg font-semibold text-primary">${arbitrage.sellPrice.toFixed(2)}</div>
-                </div>
-              </div>
-
-              {/* Spread */}
-              <div className="pt-4 border-t border-[#2a2a2a]">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Price Spread</span>
-                  <span className="text-lg font-bold text-primary">${(arbitrage.sellPrice - arbitrage.buyPrice).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+      {/* Filters */}
+      <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a] space-y-3">
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Min Profit %</label>
+            <input
+              type="number"
+              step="0.01"
+              value={minProfitPercent}
+              onChange={(e) => setMinProfitPercent(e.target.value)}
+              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground"
+            />
           </div>
-
-          {/* Trade Execution Form */}
-          <div className="space-y-4 p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a]">
-            <div className="text-xs font-bold text-primary tracking-widest">EXECUTE TRADE</div>
-
-            {/* Amount Input */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-2">Amount ({token})</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="0.01"
-                step="0.01"
-                className="w-full p-3 rounded-lg bg-background border border-[#2a2a2a] text-foreground text-sm focus:outline-none focus:border-primary"
-                placeholder="1.0"
-              />
-            </div>
-
-            {/* Calculation Display */}
-            {amount && (
-              <div className="space-y-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Buy Cost</span>
-                  <span className="text-foreground font-semibold">${(arbitrage.buyPrice * parseFloat(amount)).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Sell Value</span>
-                  <span className="text-foreground font-semibold">${(arbitrage.sellPrice * parseFloat(amount)).toFixed(2)}</span>
-                </div>
-                <div className="border-t border-primary/20 pt-2 flex justify-between text-xs font-bold">
-                  <span className="text-primary">Profit</span>
-                  <span className="text-primary">${((arbitrage.sellPrice - arbitrage.buyPrice) * parseFloat(amount)).toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Message */}
-            {message && (
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm text-primary flex gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{message}</span>
-              </div>
-            )}
-
-            {/* Execute Button */}
-            <Button
-              onClick={handleExecute}
-              disabled={executing || !arbitrage || !amount}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-3 rounded-lg"
-            >
-              {executing ? 'Processing...' : `Execute Trade - Profit: $${((arbitrage.sellPrice - arbitrage.buyPrice) * parseFloat(amount)).toFixed(2)}`}
-            </Button>
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Amount per trade</label>
+            <input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground"
+            />
           </div>
+          <Button onClick={scan} disabled={scanning} className="flex items-center gap-2">
+            {scanning ? <Loader className="w-4 h-4 animate-spin" /> : null}
+            Scan Markets
+          </Button>
         </div>
-      ) : (
-        <div className="p-8 rounded-lg border-2 border-dashed border-[#2a2a2a] text-center">
-          <AlertCircle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No arbitrage opportunities found for {token}</p>
-          <p className="text-xs text-muted-foreground mt-2">Try selecting a different token or check again later</p>
+        <p className="text-xs text-muted-foreground">
+          Scanning {Object.keys({ BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }).length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, and KuCoin. Refreshes every 30s.
+        </p>
+      </div>
+
+      {message && (
+        <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm text-primary flex gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{message}</span>
         </div>
       )}
+
+      {/* Opportunity cards */}
+      <div className="space-y-3">
+        {visible.length === 0 && !scanning && (
+          <div className="p-8 rounded-lg border-2 border-dashed border-[#2a2a2a] text-center">
+            <AlertCircle className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No opportunities above {minProfitPercent}% net profit right now.</p>
+          </div>
+        )}
+
+        {visible.map((opp) => {
+          const buyCredential = credentials.find((c) => c.exchangeId === opp.buyExchange)
+          const sellCredential = credentials.find((c) => c.exchangeId === opp.sellExchange)
+          const missingKeys = !buyCredential || !sellCredential
+          const numAmount = parseFloat(amount) || 0
+
+          return (
+            <div key={opp.token} className="rounded-xl border border-[#2a2a2a] bg-gradient-to-br from-[#1a1a1a] to-background overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-[#2a2a2a]">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-black"
+                    style={{ backgroundColor: TICKER_COLORS[opp.token] ?? '#d4af37' }}
+                  >
+                    {opp.token.slice(0, 1)}
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground">{opp.token}</div>
+                    <div className="text-xs text-muted-foreground">{opp.token}/USDT</div>
+                  </div>
+                </div>
+                <div className={`text-sm font-bold ${opp.spreadPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                  {opp.spreadPercentage.toFixed(2)}%
+                </div>
+              </div>
+
+              <div className="p-5 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[10px] text-muted-foreground tracking-widest mb-1 flex items-center gap-1">
+                    BUY FROM {!buyCredential && <span className="text-yellow-500">(no key)</span>}
+                  </div>
+                  <div className="font-bold text-foreground">{opp.buyExchange}</div>
+                  <div className="text-primary font-semibold">${opp.buyPrice.toFixed(opp.buyPrice < 1 ? 6 : 2)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-muted-foreground tracking-widest mb-1 flex items-center justify-end gap-1">
+                    {!sellCredential && <span className="text-yellow-500">(no key)</span>} SELL AT
+                  </div>
+                  <div className="font-bold text-foreground">{opp.sellExchange}</div>
+                  <div className="text-primary font-semibold">${opp.sellPrice.toFixed(opp.sellPrice < 1 ? 6 : 2)}</div>
+                </div>
+              </div>
+
+              <div className="px-5 pb-5">
+                <div className="flex items-end justify-between">
+                  <div className="text-[10px] text-muted-foreground tracking-widest">NET PROFIT</div>
+                </div>
+                <div className={`text-4xl font-bold ${opp.profitPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                  {opp.profitPercentage.toFixed(2)}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Gross: {opp.spreadPercentage.toFixed(2)}% | Fees: -{(opp.spreadPercentage - opp.profitPercentage).toFixed(2)}%
+                </div>
+              </div>
+
+              <div className="px-5 pb-5 flex items-center justify-between border-t border-[#2a2a2a] pt-4">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Est. profit on {amount || '0'} {opp.token}: </span>
+                  <span className={`font-bold ${opp.profit * numAmount >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                    ${(opp.profit * numAmount).toFixed(2)}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={missingKeys || executingToken === opp.token || opp.profitPercentage < 0}
+                  onClick={() => handleExecute(opp)}
+                >
+                  {executingToken === opp.token ? 'Executing...' : missingKeys ? 'Add Keys to Execute' : 'Execute'}
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

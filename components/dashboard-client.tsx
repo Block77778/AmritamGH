@@ -198,13 +198,7 @@ export default function DashboardClient({ user }: { user: User }) {
                   </div>
                 </div>
                 {arbMode === 'cex' ? (
-                  <ArbitrageOpportunities
-                    token={selectedToken}
-                    prices={prices}
-                    arbitrage={arbitrage}
-                    onTokenChange={setSelectedToken}
-                    credentials={credentials}
-                  />
+                  <ArbitrageOpportunities credentials={credentials} />
                 ) : (
                   <DexArbitrage />
                 )}

@@ -39,7 +39,7 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  const POPULAR_TOKENS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN']
+  const tokens = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN']
 
   // Fetch real prices function
   const fetchPrices = async (isRefresh = false) => {

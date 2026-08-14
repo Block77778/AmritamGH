@@ -173,6 +173,13 @@ export const botConfig = pgTable('bot_config', {
   dailyLossCapUsd: numeric('daily_loss_cap_usd').notNull().default('50'),
   minNetProfitBps: numeric('min_net_profit_bps').notNull().default('15'), // 0.15% minimum after fees
   cooldownSeconds: numeric('cooldown_seconds').notNull().default('300'),
+  candidateSymbols: text('candidate_symbols').notNull().default('BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,ADA/USDT,DOGE/USDT,ZEC/USDT,LTC/USDT,LINK/USDT,DOT/USDT,CC/USDT,RAIN/USDT'),
+  exchangeScanCount: numeric('exchange_scan_count').notNull().default('5'),
+  windowStartTime: text('window_start_time').notNull().default('00:00'),
+  windowDurationMinutes: numeric('window_duration_minutes').notNull().default('20'),
+  maxTradesPerWindow: numeric('max_trades_per_window').notNull().default('5'),
+  tradesThisWindow: numeric('trades_this_window').notNull().default('0'),
+  currentWindowStartedAt: timestamp('current_window_started_at'),
   autoDisabledAt: timestamp('auto_disabled_at'),
   autoDisabledReason: text('auto_disabled_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -191,6 +198,7 @@ export const botTradeLog = pgTable('bot_trade_log', {
   netProfit: numeric('net_profit').notNull(),
   dryRun: boolean('dry_run').notNull(),
   status: text('status').notNull(), // 'simulated' | 'executed' | 'failed' | 'skipped_cooldown' | 'no_opportunity'
+  strategy: text('strategy').notNull().default('arbitrage'), // 'arbitrage' | 'directional'
   error: text('error'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
@@ -199,19 +207,6 @@ export const tradingAuditLog = pgTable('trading_audit_log', {
   id: text('id').primaryKey(), userId: text('user_id').notNull(), event: text('event').notNull(),
   resourceId: text('resource_id'), metadata: text('metadata').notNull().default('{}'), createdAt: timestamp('created_at').notNull().defaultNow(),
 })
-
-// --- Additions to existing botConfig table: add these columns ---
-// (merge these fields into your existing botConfig pgTable definition)
-//   candidateSymbols: text('candidate_symbols').notNull().default('BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,ADA/USDT,DOGE/USDT,ZEC/USDT,LTC/USDT,LINK/USDT,DOT/USDT'),
-//   exchangeScanCount: numeric('exchange_scan_count').notNull().default('5'),
-//   windowStartTime: text('window_start_time').notNull().default('00:00'),
-//   windowDurationMinutes: numeric('window_duration_minutes').notNull().default('20'),
-//   maxTradesPerWindow: numeric('max_trades_per_window').notNull().default('5'),
-//   tradesThisWindow: numeric('trades_this_window').notNull().default('0'),
-//   currentWindowStartedAt: timestamp('current_window_started_at'),
-
-// --- Addition to existing botTradeLog table: add this column ---
-//   strategy: text('strategy').notNull().default('arbitrage'), // 'arbitrage' | 'directional'
 
 export const directionalBotConfig = pgTable('directional_bot_config', {
   id: text('id').primaryKey(),

@@ -247,3 +247,20 @@ export const botPositions = pgTable('bot_positions', {
   openedAt: timestamp('opened_at').notNull().defaultNow(),
   closedAt: timestamp('closed_at'),
 })
+
+export const userApproval = pgTable('user_approval', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: timestamp('reviewed_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
+// Additional botConfig columns (merge into the existing botConfig table):
+//   sessionActive: boolean('session_active').notNull().default(false),
+//   sessionStartedAt: timestamp('session_started_at'),
+//   sessionDurationMinutes: numeric('session_duration_minutes').notNull().default('30'),
+//   maxTradesPerSession: numeric('max_trades_per_session').notNull().default('10'),
+//   tradesThisSession: numeric('trades_this_session').notNull().default('0'),
+//   sessionStoppedReason: text('session_stopped_reason'),

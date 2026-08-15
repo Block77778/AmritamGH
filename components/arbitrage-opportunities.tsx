@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { scanAllOpportunities } from '@/app/actions/prices'
 import type { SwapPriceData } from '@/app/actions/prices'
 import { executeOpportunity } from '@/app/actions/trading'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, AlertCircle, TrendingUp, KeyRound, Loader } from 'lucide-react'
+import { AlertCircle, Loader } from 'lucide-react'
 
 interface ArbitrageOpportunitiesProps {
   credentials: Array<{ id: string; exchangeId: string; label: string; status: string }>
@@ -22,6 +21,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
   const [scanning, setScanning] = useState(false)
   const [lastScanAt, setLastScanAt] = useState<number | null>(null)
   const [minProfitPercent, setMinProfitPercent] = useState('0.1')
+  const [minVolume, setMinVolume] = useState('0')
   const [executingToken, setExecutingToken] = useState<string | null>(null)
   const [amount, setAmount] = useState('1')
   const [message, setMessage] = useState('')
@@ -44,7 +44,8 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
   }, [scan])
 
   const threshold = parseFloat(minProfitPercent) || 0
-  const visible = opportunities.filter((o) => o.profitPercentage >= threshold)
+  const volumeThreshold = parseFloat(minVolume) || 0
+  const visible = opportunities.filter((o) => o.profitPercentage >= threshold && (o.volume24h ?? 0) >= volumeThreshold)
   const bestSpread = opportunities.length > 0 ? Math.max(...opportunities.map((o) => o.spreadPercentage)) : 0
 
   const handleExecute = async (opp: SwapPriceData) => {
@@ -111,6 +112,19 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
             />
           </div>
           <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Min Volume (24h)</label>
+            <select
+              value={minVolume}
+              onChange={(e) => setMinVolume(e.target.value)}
+              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground"
+            >
+              <option value="0">Any</option>
+              <option value="1000000">$1,000,000+</option>
+              <option value="10000000">$10,000,000+</option>
+              <option value="50000000">$50,000,000+</option>
+            </select>
+          </div>
+          <div className="flex-1">
             <label className="text-xs text-muted-foreground block mb-1">Amount per trade</label>
             <input
               type="number"
@@ -126,7 +140,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Scanning {Object.keys({ BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }).length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, and KuCoin. Refreshes every 30s.
+          Scanning {Object.keys(symbolMapKeys).length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, and KuCoin. Refreshes every 30s.
         </p>
       </div>
 
@@ -164,7 +178,9 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
                   </div>
                   <div>
                     <div className="font-bold text-foreground">{opp.token}</div>
-                    <div className="text-xs text-muted-foreground">{opp.token}/USDT</div>
+                    <div className="text-xs text-muted-foreground">
+                      {opp.token}/USDT · Vol: {opp.volume24h ? `$${(opp.volume24h / 1_000_000).toFixed(2)}M` : '—'}
+                    </div>
                   </div>
                 </div>
                 <div className={`text-sm font-bold ${opp.spreadPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
@@ -190,9 +206,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
               </div>
 
               <div className="px-5 pb-5">
-                <div className="flex items-end justify-between">
-                  <div className="text-[10px] text-muted-foreground tracking-widest">NET PROFIT</div>
-                </div>
+                <div className="text-[10px] text-muted-foreground tracking-widest">NET PROFIT</div>
                 <div className={`text-4xl font-bold ${opp.profitPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
                   {opp.profitPercentage.toFixed(2)}%
                 </div>
@@ -223,3 +237,5 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
     </div>
   )
 }
+
+const symbolMapKeys = { BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }

@@ -16,12 +16,44 @@ const TICKER_COLORS: Record<string, string> = {
   ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a',
 }
 
+// Free, open-source icon set (MIT licensed, hosted on jsdelivr). Falls back
+// to a colored letter circle for any ticker it doesn't have (e.g. CC, RAIN).
+function CoinIcon({ symbol, size = 44 }: { symbol: string; size?: number }) {
+  const [failed, setFailed] = useState(false)
+  const iconUrl = `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1.x/128/color/${symbol.toLowerCase()}.png`
+
+  if (failed) {
+    return (
+      <div
+        className="rounded-full flex items-center justify-center font-bold text-black flex-shrink-0"
+        style={{ backgroundColor: TICKER_COLORS[symbol] ?? '#d4af37', width: size, height: size }}
+      >
+        {symbol.slice(0, 1)}
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={iconUrl}
+      alt={symbol}
+      width={size}
+      height={size}
+      className="rounded-full flex-shrink-0 bg-[#0a0a0a]"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+const symbolMapKeys = { BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }
+
 export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportunitiesProps) {
   const [opportunities, setOpportunities] = useState<SwapPriceData[]>([])
   const [scanning, setScanning] = useState(false)
   const [lastScanAt, setLastScanAt] = useState<number | null>(null)
   const [minProfitPercent, setMinProfitPercent] = useState('0.1')
   const [minVolume, setMinVolume] = useState('0')
+  const [showAll, setShowAll] = useState(false)
   const [executingToken, setExecutingToken] = useState<string | null>(null)
   const [amount, setAmount] = useState('1')
   const [message, setMessage] = useState('')
@@ -45,7 +77,9 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
 
   const threshold = parseFloat(minProfitPercent) || 0
   const volumeThreshold = parseFloat(minVolume) || 0
-  const visible = opportunities.filter((o) => o.profitPercentage >= threshold && (o.volume24h ?? 0) >= volumeThreshold)
+  const visible = showAll
+    ? opportunities
+    : opportunities.filter((o) => o.profitPercentage >= threshold && (o.volume24h ?? 0) >= volumeThreshold)
   const bestSpread = opportunities.length > 0 ? Math.max(...opportunities.map((o) => o.spreadPercentage)) : 0
 
   const handleExecute = async (opp: SwapPriceData) => {
@@ -100,23 +134,25 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
 
       {/* Filters */}
       <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a] space-y-3">
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="flex-1 min-w-[100px]">
             <label className="text-xs text-muted-foreground block mb-1">Min Profit %</label>
             <input
               type="number"
               step="0.01"
               value={minProfitPercent}
               onChange={(e) => setMinProfitPercent(e.target.value)}
-              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground"
+              disabled={showAll}
+              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground disabled:opacity-50"
             />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-[120px]">
             <label className="text-xs text-muted-foreground block mb-1">Min Volume (24h)</label>
             <select
               value={minVolume}
               onChange={(e) => setMinVolume(e.target.value)}
-              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground"
+              disabled={showAll}
+              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground disabled:opacity-50"
             >
               <option value="0">Any</option>
               <option value="1000000">$1,000,000+</option>
@@ -124,7 +160,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
               <option value="50000000">$50,000,000+</option>
             </select>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-[100px]">
             <label className="text-xs text-muted-foreground block mb-1">Amount per trade</label>
             <input
               type="number"
@@ -139,6 +175,10 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
             Scan Markets
           </Button>
         </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+          Show all {opportunities.length} scanned coins (ignore filters — useful for checking the scanner is working even when nothing's profitable)
+        </label>
         <p className="text-xs text-muted-foreground">
           Scanning {Object.keys(symbolMapKeys).length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, and KuCoin. Refreshes every 30s.
         </p>
@@ -156,7 +196,11 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
         {visible.length === 0 && !scanning && (
           <div className="p-8 rounded-lg border-2 border-dashed border-[#2a2a2a] text-center">
             <AlertCircle className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">No opportunities above {minProfitPercent}% net profit right now.</p>
+            <p className="text-muted-foreground">
+              {opportunities.length === 0
+                ? 'The scanner found no live quotes at all — check back in a moment or hit Scan Markets.'
+                : `No opportunities above ${minProfitPercent}% net profit right now. Try "Show all scanned coins" to see real current spreads.`}
+            </p>
           </div>
         )}
 
@@ -170,12 +214,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
             <div key={opp.token} className="rounded-xl border border-[#2a2a2a] bg-gradient-to-br from-[#1a1a1a] to-background overflow-hidden">
               <div className="p-5 flex items-center justify-between border-b border-[#2a2a2a]">
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-black"
-                    style={{ backgroundColor: TICKER_COLORS[opp.token] ?? '#d4af37' }}
-                  >
-                    {opp.token.slice(0, 1)}
-                  </div>
+                  <CoinIcon symbol={opp.token} />
                   <div>
                     <div className="font-bold text-foreground">{opp.token}</div>
                     <div className="text-xs text-muted-foreground">
@@ -237,5 +276,3 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
     </div>
   )
 }
-
-const symbolMapKeys = { BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }

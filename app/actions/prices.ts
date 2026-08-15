@@ -12,6 +12,7 @@ export interface SwapPriceData {
   spreadPercentage: number
   profit: number
   profitPercentage: number
+  volume24h: number | null
   timestamp: number
   source: 'live-order-book'
 }
@@ -42,16 +43,26 @@ export async function fetchSwapPrices(token: string): Promise<SwapPriceData | nu
   const buyFeeCost = buy.ask * buyFeeRate
   const sellFeeCost = sell.bid * sellFeeRate
   const profit = spread - buyFeeCost - sellFeeCost
+  const volume24h = buy.quoteVolume24h && sell.quoteVolume24h
+    ? Math.max(buy.quoteVolume24h, sell.quoteVolume24h)
+    : (buy.quoteVolume24h ?? sell.quoteVolume24h ?? null)
 
   return {
     token: token.toUpperCase(), buyExchange: buy.exchangeId, buyPrice: buy.ask,
     sellExchange: sell.exchangeId, sellPrice: sell.bid, spread,
     spreadPercentage: (spread / buy.ask) * 100, profit, profitPercentage: (profit / buy.ask) * 100,
+    volume24h,
     timestamp: Math.min(buy.timestamp, sell.timestamp), source: 'live-order-book',
   }
 }
 
 export async function fetchAllTokenPrices() {
+  const tokens = Object.keys(symbolMap)
+  const results = await Promise.all(tokens.map(fetchSwapPrices))
+  return results.filter((result): result is SwapPriceData => result !== null)
+}
+
+export async function scanAllOpportunities() {
   const tokens = Object.keys(symbolMap)
   const results = await Promise.all(tokens.map(fetchSwapPrices))
   return results.filter((result): result is SwapPriceData => result !== null)
@@ -76,10 +87,4 @@ export async function fetchTokenQuotes(token: string) {
       timestamp: quote.timestamp,
     }]
   })
-}
-
-export async function scanAllOpportunities() {
-  const tokens = Object.keys(symbolMap)
-  const results = await Promise.all(tokens.map(fetchSwapPrices))
-  return results.filter((result): result is SwapPriceData => result !== null)
 }

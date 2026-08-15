@@ -9,6 +9,7 @@ export type MarketQuote = {
   ask: number
   bidVolume: number | null
   askVolume: number | null
+  quoteVolume24h: number | null
   timestamp: number
   takerFee: number | null
 }
@@ -63,6 +64,7 @@ export async function fetchQuote(exchangeId: string, symbol: string, credentials
       ask: ticker.ask,
       bidVolume: ticker.bidVolume ?? null,
       askVolume: ticker.askVolume ?? null,
+      quoteVolume24h: ticker.quoteVolume ?? null,
       timestamp: ticker.timestamp ?? Date.now(),
       takerFee: market.taker ?? null,
     }

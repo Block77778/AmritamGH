@@ -13,8 +13,17 @@ interface ArbitrageOpportunitiesProps {
 
 const TICKER_COLORS: Record<string, string> = {
   BTC: '#f7931a', ETH: '#627eea', SOL: '#14f195', XRP: '#23292f', ADA: '#0033ad', DOGE: '#c2a633',
-  ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a',
+  ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a', LTC: '#bfbbbb', LINK: '#2a5ada', DOT: '#e6007a',
+  AVAX: '#e84142', UNI: '#ff007a', ATOM: '#2e3148', NEAR: '#000000', APT: '#000000', ARB: '#28a0f0',
+  OP: '#ff0420', INJ: '#00d2ff', SEI: '#941ee8', SUI: '#4da2ff', FIL: '#0090ff', RUNE: '#33ff99',
+  HBAR: '#000000', PEPE: '#4caf50', SHIB: '#ffa409', WIF: '#c8a2c8', BONK: '#f7b500',
 }
+
+const SCANNED_TOKENS = [
+  'BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN',
+  'LTC', 'LINK', 'DOT', 'AVAX', 'UNI', 'ATOM', 'NEAR', 'APT', 'ARB', 'OP', 'INJ', 'SEI',
+  'SUI', 'FIL', 'RUNE', 'HBAR', 'PEPE', 'SHIB', 'WIF', 'BONK',
+]
 
 // Free, open-source icon set (MIT licensed, hosted on jsdelivr). Falls back
 // to a colored letter circle for any ticker it doesn't have (e.g. CC, RAIN).
@@ -45,13 +54,11 @@ function CoinIcon({ symbol, size = 44 }: { symbol: string; size?: number }) {
   )
 }
 
-const symbolMapKeys = { BTC: 1, ETH: 1, SOL: 1, XRP: 1, ADA: 1, DOGE: 1, ZEC: 1, CC: 1, RAIN: 1 }
-
 export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportunitiesProps) {
   const [opportunities, setOpportunities] = useState<SwapPriceData[]>([])
   const [scanning, setScanning] = useState(false)
   const [lastScanAt, setLastScanAt] = useState<number | null>(null)
-  const [minProfitPercent, setMinProfitPercent] = useState('0.1')
+  const [minProfitPercent, setMinProfitPercent] = useState('0')
   const [minVolume, setMinVolume] = useState('0')
   const [showAll, setShowAll] = useState(false)
   const [executingToken, setExecutingToken] = useState<string | null>(null)
@@ -112,6 +119,21 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
 
   return (
     <div className="space-y-6">
+      {/* Risk disclaimer — permanent, not dismissible */}
+      <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex gap-3">
+        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-muted-foreground">
+          <p className="text-red-300 font-semibold mb-1">You are fully responsible for trades placed here</p>
+          <p>
+            This scanner deliberately includes smaller, less liquid exchanges and thinner-volume tokens to surface
+            larger spreads. A quoted spread reflects the best bid/ask at the moment of the scan — it does not guarantee
+            that size is available to fill at that price, and thin order books can move or vanish before your order
+            lands. Prices, spreads, and liquidity can change or disappear in seconds. Nothing here is financial advice,
+            and trading on this platform carries real risk of loss.
+          </p>
+        </div>
+      </div>
+
       {/* Stat header */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-4 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a]">
@@ -180,7 +202,7 @@ export default function ArbitrageOpportunities({ credentials }: ArbitrageOpportu
           Show all {opportunities.length} scanned coins (ignore filters — useful for checking the scanner is working even when nothing's profitable)
         </label>
         <p className="text-xs text-muted-foreground">
-          Scanning {Object.keys(symbolMapKeys).length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, and KuCoin. Refreshes every 30s.
+          Scanning {SCANNED_TOKENS.length} tokens across Binance, Kraken, Coinbase, OKX, Bybit, KuCoin, HTX, and MEXC. Refreshes every 30s.
         </p>
       </div>
 

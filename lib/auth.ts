@@ -1,5 +1,9 @@
 import { betterAuth } from 'better-auth'
 import { pool } from '@/lib/db'
+import { db } from '@/lib/db'
+import { userApproval } from '@/lib/db/schema'
+import { nanoid } from 'nanoid'
+import { isAdminEmail } from '@/lib/admin'
 
 async function sendResetPasswordEmail(to: string, resetUrl: string) {
   const apiKey = process.env.RESEND_API_KEY
@@ -48,7 +52,22 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url)
     },
-    resetPasswordTokenExpiresIn: 60 * 60, // 1 hour
+    resetPasswordTokenExpiresIn: 60 * 60,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await db.insert(userApproval).values({
+            id: nanoid(),
+            userId: user.id,
+            status: isAdminEmail(user.email) ? 'approved' : 'pending',
+            reviewedBy: isAdminEmail(user.email) ? 'auto (admin email)' : null,
+            reviewedAt: isAdminEmail(user.email) ? new Date() : null,
+          })
+        },
+      },
+    },
   },
   trustedOrigins: [
     'http://localhost:3000',
@@ -65,8 +84,8 @@ export const auth = betterAuth({
       : []),
   ],
   session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 1 day
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
   },
   ...(process.env.NODE_ENV === 'development'
     ? {

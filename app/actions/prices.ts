@@ -17,12 +17,23 @@ export interface SwapPriceData {
   source: 'live-order-book'
 }
 
+// Wide, deliberately liquidity-agnostic token list — majors, mid-caps, and
+// memecoins. Thinner markets are included on purpose because they're more
+// likely to show real, larger spreads than heavily-arbitraged majors.
 const symbolMap: Record<string, string> = {
   BTC: 'BTC/USDT', ETH: 'ETH/USDT', SOL: 'SOL/USDT', XRP: 'XRP/USDT', ADA: 'ADA/USDT', DOGE: 'DOGE/USDT',
   ZEC: 'ZEC/USDT', CC: 'CC/USDT', RAIN: 'RAIN/USDT',
+  LTC: 'LTC/USDT', LINK: 'LINK/USDT', DOT: 'DOT/USDT', AVAX: 'AVAX/USDT', UNI: 'UNI/USDT', ATOM: 'ATOM/USDT',
+  NEAR: 'NEAR/USDT', APT: 'APT/USDT', ARB: 'ARB/USDT', OP: 'OP/USDT', INJ: 'INJ/USDT', SEI: 'SEI/USDT',
+  SUI: 'SUI/USDT', FIL: 'FIL/USDT', RUNE: 'RUNE/USDT', HBAR: 'HBAR/USDT',
+  PEPE: 'PEPE/USDT', SHIB: 'SHIB/USDT', WIF: 'WIF/USDT', BONK: 'BONK/USDT',
 }
 
-const PRICE_SOURCE_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin']
+// Widened on purpose to include smaller/less-arbitraged exchanges — liquidity
+// and exchange size are not filtered here per product requirements. This
+// means quoted spreads on thin pairs may not be fully fillable at size; see
+// the risk banner shown alongside these results in the UI.
+const PRICE_SOURCE_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin', 'htx', 'mexc']
 
 export async function fetchSwapPrices(token: string): Promise<SwapPriceData | null> {
   const symbol = symbolMap[token.toUpperCase()]

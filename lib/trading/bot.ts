@@ -4,10 +4,7 @@ import { db } from '@/lib/db'
 import { botConfig, botTradeLog, exchangeCredentials } from '@/lib/db/schema'
 import { findCrossExchangeOpportunities } from './opportunities'
 import { executeOpportunityCore } from './execution'
-import { isWithinWindow, getTodaysWindowStart } from './windows'
 
-// Vetted, high-volume exchanges only — deliberately not "all of ccxt".
-// exchangeScanCount picks the top N from this list for price scanning.
 const EXCHANGE_POOL = ['binance', 'coinbase', 'okx', 'bybit', 'kraken', 'kucoin', 'bitget', 'gate', 'htx', 'mexc']
 
 async function getTodaysRealizedPnL(userId: string): Promise<number> {
@@ -29,33 +26,59 @@ async function isInCooldown(userId: string, symbol: string, cooldownSeconds: num
   return Date.now() - last.createdAt.getTime() < cooldownSeconds * 1000
 }
 
+// Starts a new session: bot picks a random duration between 30 and 60
+// minutes. This is a bounded random choice, not a market-aware prediction —
+// there's no signal in this codebase (volatility, volume trend, etc.) that
+// would justify claiming it's "smart" about the choice.
+export async function startBotSession(userId: string) {
+  const durationMinutes = 30 + Math.floor(Math.random() * 31) // 30–60 inclusive
+  await db.update(botConfig).set({
+    enabled: true,
+    sessionActive: true,
+    sessionStartedAt: new Date(),
+    sessionDurationMinutes: String(durationMinutes),
+    tradesThisSession: 0,
+    sessionStoppedReason: null,
+    updatedAt: new Date(),
+  }).where(eq(botConfig.userId, userId))
+  return { durationMinutes }
+}
+
+export async function stopBotSession(userId: string, reason: string = 'manual_stop') {
+  await db.update(botConfig).set({
+    enabled: false,
+    sessionActive: false,
+    sessionStoppedReason: reason,
+    updatedAt: new Date(),
+  }).where(eq(botConfig.userId, userId))
+}
+
 export async function runBotForUser(userId: string) {
   const configRows = await db.select().from(botConfig).where(eq(botConfig.userId, userId)).limit(1)
   const config = configRows[0]
-  if (!config || !config.enabled) return { skipped: 'disabled' }
-
-  if (!isWithinWindow(config.windowStartTime, Number(config.windowDurationMinutes))) {
-    return { skipped: 'outside_trading_window' }
+  if (!config || !config.enabled || !config.sessionActive || !config.sessionStartedAt) {
+    return { skipped: 'no_active_session' }
   }
 
-  const windowStart = getTodaysWindowStart(config.windowStartTime)
-  let tradesThisWindow = Number(config.tradesThisWindow)
-  if (!config.currentWindowStartedAt || config.currentWindowStartedAt.getTime() < windowStart.getTime()) {
-    await db.update(botConfig).set({ currentWindowStartedAt: windowStart, tradesThisWindow: 0, updatedAt: new Date() }).where(eq(botConfig.userId, userId))
-    tradesThisWindow = 0
+  const elapsedMinutes = (Date.now() - config.sessionStartedAt.getTime()) / 60_000
+  if (elapsedMinutes >= Number(config.sessionDurationMinutes)) {
+    await stopBotSession(userId, 'session_duration_elapsed')
+    return { skipped: 'session_duration_elapsed' }
   }
 
-  if (tradesThisWindow >= Number(config.maxTradesPerWindow)) {
-    return { skipped: 'window_trade_limit_reached' }
+  const tradesThisSession = Number(config.tradesThisSession)
+  if (tradesThisSession >= Number(config.maxTradesPerSession)) {
+    await stopBotSession(userId, 'max_trades_reached')
+    return { skipped: 'max_trades_reached' }
   }
 
   if (!config.dryRun) {
     const pnlToday = await getTodaysRealizedPnL(userId)
     if (pnlToday <= -Number(config.dailyLossCapUsd)) {
+      await stopBotSession(userId, 'daily_loss_cap_reached')
       await db.update(botConfig).set({
-        enabled: false, autoDisabledAt: new Date(),
+        autoDisabledAt: new Date(),
         autoDisabledReason: `Daily loss cap of $${config.dailyLossCapUsd} reached (realized: $${pnlToday.toFixed(2)})`,
-        updatedAt: new Date(),
       }).where(eq(botConfig.userId, userId))
       return { skipped: 'daily_loss_cap_reached', pnlToday }
     }
@@ -74,7 +97,7 @@ export async function runBotForUser(userId: string) {
     if (top && (!best || top.netProfitBps > best.netProfitBps)) { best = top; bestSymbol = symbol }
   }
 
-  if (!best) return { skipped: 'no_opportunity_across_candidates' }
+  if (!best) return { skipped: 'no_opportunity_across_candidates', minutesRemaining: Math.max(0, Number(config.sessionDurationMinutes) - elapsedMinutes) }
 
   const logId = nanoid()
 
@@ -84,8 +107,10 @@ export async function runBotForUser(userId: string) {
       amount: String(config.maxAmountPerTrade), buyPrice: String(best.buy.ask), sellPrice: String(best.sell.bid),
       netProfit: String(best.netProfit), dryRun: true, status: 'simulated', strategy: 'arbitrage',
     })
-    await db.update(botConfig).set({ tradesThisWindow: tradesThisWindow + 1, updatedAt: new Date() }).where(eq(botConfig.userId, userId))
-    return { symbol: bestSymbol, status: 'simulated', netProfit: best.netProfit }
+    const newCount = tradesThisSession + 1
+    await db.update(botConfig).set({ tradesThisSession: newCount, updatedAt: new Date() }).where(eq(botConfig.userId, userId))
+    if (newCount >= Number(config.maxTradesPerSession)) await stopBotSession(userId, 'max_trades_reached')
+    return { symbol: bestSymbol, status: 'simulated', netProfit: best.netProfit, tradesThisSession: newCount }
   }
 
   const buyCred = credentialRows.find((c) => c.exchangeId === best.buy.exchangeId)
@@ -104,8 +129,10 @@ export async function runBotForUser(userId: string) {
       amount: String(config.maxAmountPerTrade), buyPrice: String(best.buy.ask), sellPrice: String(best.sell.bid),
       netProfit: String(best.netProfit), dryRun: false, status: 'executed', strategy: 'arbitrage',
     })
-    await db.update(botConfig).set({ tradesThisWindow: tradesThisWindow + 1, updatedAt: new Date() }).where(eq(botConfig.userId, userId))
-    return { symbol: bestSymbol, status: 'executed', ...outcome }
+    const newCount = tradesThisSession + 1
+    await db.update(botConfig).set({ tradesThisSession: newCount, updatedAt: new Date() }).where(eq(botConfig.userId, userId))
+    if (newCount >= Number(config.maxTradesPerSession)) await stopBotSession(userId, 'max_trades_reached')
+    return { symbol: bestSymbol, status: 'executed', tradesThisSession: newCount, ...outcome }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     await db.insert(botTradeLog).values({
@@ -118,7 +145,7 @@ export async function runBotForUser(userId: string) {
 }
 
 export async function runBotForAllEnabledUsers() {
-  const enabledConfigs = await db.select().from(botConfig).where(eq(botConfig.enabled, true))
+  const enabledConfigs = await db.select().from(botConfig).where(and(eq(botConfig.enabled, true), eq(botConfig.sessionActive, true)))
   const outcomes = await Promise.allSettled(enabledConfigs.map((c) => runBotForUser(c.userId)))
   return outcomes.map((o, i) => ({ userId: enabledConfigs[i].userId, ...(o.status === 'fulfilled' ? o.value : { error: 'run failed' }) }))
 }

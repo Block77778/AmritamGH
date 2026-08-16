@@ -47,12 +47,8 @@ export default function AdminPanel() {
               }`}>
                 {u.status.toUpperCase()}
               </span>
-              {u.status === 'pending' && (
-                <>
-                  <Button size="sm" onClick={() => handleApprove(u.userId)}>Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleReject(u.userId)}>Reject</Button>
-                </>
-              )}
+              <Button size="sm" onClick={() => handleApprove(u.userId)} disabled={u.status === 'approved'}>Approve</Button>
+              <Button size="sm" variant="outline" onClick={() => handleReject(u.userId)} disabled={u.status === 'rejected'}>Reject</Button>
             </div>
           </div>
         ))}

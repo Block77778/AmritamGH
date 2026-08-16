@@ -27,6 +27,7 @@ const symbolMap: Record<string, string> = {
   NEAR: 'NEAR/USDT', APT: 'APT/USDT', ARB: 'ARB/USDT', OP: 'OP/USDT', INJ: 'INJ/USDT', SEI: 'SEI/USDT',
   SUI: 'SUI/USDT', FIL: 'FIL/USDT', RUNE: 'RUNE/USDT', HBAR: 'HBAR/USDT',
   PEPE: 'PEPE/USDT', SHIB: 'SHIB/USDT', WIF: 'WIF/USDT', BONK: 'BONK/USDT',
+  DEXE: 'DEXE/USDT',
 }
 
 // Widened on purpose to include smaller/less-arbitraged exchanges — liquidity

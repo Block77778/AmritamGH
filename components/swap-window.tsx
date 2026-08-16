@@ -13,7 +13,10 @@ interface SwapWindowProps {
 
 const TICKER_COLORS: Record<string, string> = {
   BTC: '#f7931a', ETH: '#627eea', SOL: '#14f195', XRP: '#23292f', ADA: '#0033ad', DOGE: '#c2a633',
-  ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a',
+  ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a', LTC: '#bfbbbb', LINK: '#2a5ada', DOT: '#e6007a',
+  AVAX: '#e84142', UNI: '#ff007a', ATOM: '#2e3148', NEAR: '#000000', APT: '#000000', ARB: '#28a0f0',
+  OP: '#ff0420', INJ: '#00d2ff', SEI: '#941ee8', SUI: '#4da2ff', FIL: '#0090ff', RUNE: '#33ff99',
+  HBAR: '#000000', PEPE: '#4caf50', SHIB: '#ffa409', WIF: '#c8a2c8', BONK: '#f7b500', DEXE: '#6f4fd1',
 }
 
 const REFERENCE_AMOUNT = 1000
@@ -64,6 +67,7 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
 
   const profitable = opportunities.filter((o) => o.profitPercentage > 0)
   const bestSpread = opportunities.length > 0 ? Math.max(...opportunities.map((o) => o.spreadPercentage)) : 0
+  const tradeLink = (token: string) => (isAuthenticated ? `/dashboard?pair=${token}` : `/sign-up?pair=${token}`)
 
   return (
     <div className="w-full">
@@ -75,7 +79,7 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
               Live <span className="text-primary">Arbitrage Scanner</span>
             </h2>
             <p className="text-muted-foreground">
-              Real prices, scanned live across major exchanges — sign up to trade what you see
+              Real prices, scanned live across major exchanges — pick an opportunity to trade it
             </p>
           </div>
 
@@ -106,7 +110,6 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
           </div>
         </div>
 
-        {/* Stat header */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-4 rounded-lg bg-gradient-to-br from-[#1a1a1a] to-background border border-[#2a2a2a]">
             <div className="text-[10px] text-muted-foreground tracking-widest mb-1">OPPORTUNITIES</div>
@@ -127,7 +130,6 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
         </div>
       </div>
 
-      {/* Opportunity cards */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
@@ -185,18 +187,23 @@ export function SwapWindow({ isAuthenticated = false }: SwapWindowProps) {
                 </div>
               </div>
 
-              <div className="px-5 pb-5 flex items-center justify-between border-t border-[#2a2a2a] pt-3 text-xs">
+              <div className="px-5 pb-3 flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Est. on ${REFERENCE_AMOUNT.toLocaleString()}</span>
                 <span className={`font-bold ${opp.profitPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
                   ${((opp.profit / opp.buyPrice) * REFERENCE_AMOUNT).toFixed(2)}
                 </span>
               </div>
+
+              <Link href={tradeLink(opp.token)} className="block px-5 pb-5">
+                <Button size="sm" className="w-full">
+                  Trade This Pair
+                </Button>
+              </Link>
             </div>
           ))}
         </div>
       )}
 
-      {/* Single CTA */}
       <div className="max-w-md mx-auto space-y-2">
         {isAuthenticated ? (
           <Link href="/dashboard" className="block">

@@ -16,13 +16,13 @@ const TICKER_COLORS: Record<string, string> = {
   ZEC: '#f4b728', CC: '#f5e663', RAIN: '#d4e13a', LTC: '#bfbbbb', LINK: '#2a5ada', DOT: '#e6007a',
   AVAX: '#e84142', UNI: '#ff007a', ATOM: '#2e3148', NEAR: '#000000', APT: '#000000', ARB: '#28a0f0',
   OP: '#ff0420', INJ: '#00d2ff', SEI: '#941ee8', SUI: '#4da2ff', FIL: '#0090ff', RUNE: '#33ff99',
-  HBAR: '#000000', PEPE: '#4caf50', SHIB: '#ffa409', WIF: '#c8a2c8', BONK: '#f7b500',
+  HBAR: '#000000', PEPE: '#4caf50', SHIB: '#ffa409', WIF: '#c8a2c8', BONK: '#f7b500', DEXE: '#6f4fd1',
 }
 
 const SCANNED_TOKENS = [
   'BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'ZEC', 'CC', 'RAIN',
   'LTC', 'LINK', 'DOT', 'AVAX', 'UNI', 'ATOM', 'NEAR', 'APT', 'ARB', 'OP', 'INJ', 'SEI',
-  'SUI', 'FIL', 'RUNE', 'HBAR', 'PEPE', 'SHIB', 'WIF', 'BONK',
+  'SUI', 'FIL', 'RUNE', 'HBAR', 'PEPE', 'SHIB', 'WIF', 'BONK', 'DEXE',
 ]
 
 // Free, open-source icon set (MIT licensed, hosted on jsdelivr). Falls back

@@ -3,7 +3,7 @@
 // approve/reject everyone else from /admin.
 export const ADMIN_EMAILS = [
   'theblockchainsolutions@gmail.com',
-  'abdulrafay.ali07@gmail.com',
+  'AmritamGH123@gmail.com',
 ]
 
 export function isAdminEmail(email: string) {

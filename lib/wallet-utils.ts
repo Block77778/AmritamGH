@@ -41,6 +41,11 @@ export function isValidBitcoinAddress(address: string): boolean {
   return Object.values(patterns).some((pattern) => pattern.test(address))
 }
 
+// Validate Tron address (base58, starts with 'T', 34 chars)
+export function isValidTronAddress(address: string): boolean {
+  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)
+}
+
 // Get wallet provider info
 export function getWalletInfo(provider: string, chainType: string) {
   const providers: Record<string, Record<string, { name: string; icon: string }>> = {
@@ -49,6 +54,7 @@ export function getWalletInfo(provider: string, chainType: string) {
       WalletConnect: { name: 'WalletConnect', icon: 'W' },
       CoinbaseWallet: { name: 'Coinbase Wallet', icon: 'C' },
       TrustWallet: { name: 'Trust Wallet', icon: 'T' },
+      OkxWallet: { name: 'OKX Wallet', icon: 'O' },
     },
     Solana: {
       Phantom: { name: 'Phantom', icon: 'P' },
@@ -59,6 +65,9 @@ export function getWalletInfo(provider: string, chainType: string) {
       Unisat: { name: 'Unisat', icon: 'U' },
       OKX: { name: 'OKX Wallet', icon: 'O' },
       Leather: { name: 'Leather', icon: 'L' },
+    },
+    Tron: {
+      TronLink: { name: 'TronLink', icon: 'T' },
     },
   }
 
@@ -79,7 +88,7 @@ export async function isWalletConnected(walletAddress: string, chainType: string
       const balance = await connection.getBalance(new PublicKey(walletAddress))
       return balance >= 0
     }
-    // For EVM and Bitcoin, assume valid format means connected (actual connection check via wagmi/library)
+    // For EVM, Bitcoin, and Tron, assume valid format means connected (actual connection check via wagmi/library)
     return true
   } catch {
     return false

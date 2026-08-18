@@ -264,3 +264,22 @@ export const userApproval = pgTable('user_approval', {
 //   maxTradesPerSession: numeric('max_trades_per_session').notNull().default('10'),
 //   tradesThisSession: numeric('trades_this_session').notNull().default('0'),
 //   sessionStoppedReason: text('session_stopped_reason'),
+
+export const scheduledOrders = pgTable('scheduled_orders', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  credentialId: text('credential_id').notNull(),
+  exchangeId: text('exchange_id').notNull(),
+  symbol: text('symbol').notNull(),
+  side: text('side').notNull(), // 'buy' | 'sell'
+  amount: numeric('amount').notNull(),
+  triggerType: text('trigger_type').notNull(), // 'price' | 'time'
+  triggerPrice: numeric('trigger_price'),
+  triggerAt: timestamp('trigger_at'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'executed' | 'cancelled' | 'failed'
+  exchangeOrderId: text('exchange_order_id'),
+  filledPrice: numeric('filled_price'),
+  error: text('error'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  executedAt: timestamp('executed_at'),
+})

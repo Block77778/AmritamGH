@@ -120,3 +120,18 @@ export async function cancelOrder(exchangeId: string, credentials: ExchangeCrede
     await exchange.close()
   }
 }
+
+export async function placeMarketOrder(
+  exchangeId: string,
+  credentials: ExchangeCredentials,
+  symbol: string,
+  side: 'buy' | 'sell',
+  amount: number,
+): Promise<Order> {
+  const exchange = createExchange(exchangeId, credentials)
+  try {
+    return await exchange.createOrder(symbol, 'market', side, amount)
+  } finally {
+    await exchange.close()
+  }
+}

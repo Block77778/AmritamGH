@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { getBotConfig, updateBotConfig, getBotTradeLog, startSession, stopSession, runBotNow } from '@/app/actions/bot'
 import { Bot, ShieldAlert, Loader, Play, Square, Clock } from 'lucide-react'
 
+const TRADE_COUNT_OPTIONS = [3, 5, 7, 10]
+
 export default function BotControlPanel() {
   const [config, setConfig] = useState<any>(null)
   const [log, setLog] = useState<any[]>([])
@@ -101,7 +103,7 @@ export default function BotControlPanel() {
         </div>
       )}
 
-      {/* Session control — the actual "window time" visibility */}
+      {/* Session control */}
       <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a] space-y-4">
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5 text-primary" />
@@ -166,6 +168,29 @@ export default function BotControlPanel() {
           </button>
         </div>
 
+        <div>
+          <label className="text-xs text-muted-foreground block mb-2">How many times should the bot trade this session?</label>
+          <div className="grid grid-cols-4 gap-2">
+            {TRADE_COUNT_OPTIONS.map((n) => (
+              <button
+                key={n}
+                onClick={() => save({ maxTradesPerSession: n })}
+                disabled={sessionActive}
+                className={`py-2 rounded-lg text-sm font-bold disabled:opacity-50 ${
+                  Number(config.maxTradesPerSession) === n ? 'bg-primary text-primary-foreground' : 'bg-[#2a2a2a] text-muted-foreground hover:bg-[#333]'
+                }`}
+              >
+                {n}×
+              </button>
+            ))}
+          </div>
+          {!TRADE_COUNT_OPTIONS.includes(Number(config.maxTradesPerSession)) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Currently set to a custom value ({config.maxTradesPerSession}). Pick one of the options above to switch to a preset.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="text-xs text-muted-foreground block mb-1">Candidate symbols (comma-separated, bot picks the best one each run)</label>
@@ -175,11 +200,6 @@ export default function BotControlPanel() {
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Max amount per trade</label>
             <input type="number" value={config.maxAmountPerTrade} onChange={(e) => setConfig({ ...config, maxAmountPerTrade: e.target.value })} onBlur={() => save({})}
-              className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground" />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Max trades per session</label>
-            <input type="number" value={config.maxTradesPerSession} onChange={(e) => setConfig({ ...config, maxTradesPerSession: e.target.value })} onBlur={() => save({})}
               className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground" />
           </div>
           <div>

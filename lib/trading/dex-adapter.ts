@@ -105,10 +105,6 @@ export type DexArbitrageResult = {
   timestamp: number
 }
 
-// Two-hop check: quote how much `base` you'd get for `quoteAmountIn` of `quote`
-// on each DEX (leg 1 candidates), then quote how much `quote` you'd get back
-// selling that `base` on each DEX (leg 2 candidates). Both legs are priced
-// independently and read-only — no funds move until execution.
 export async function findDexArbitrage(
   base: keyof typeof MAINNET_TOKENS,
   quote: keyof typeof MAINNET_TOKENS,
@@ -134,7 +130,7 @@ export async function findDexArbitrage(
   if (!uniSell || !sushiSell) return null
 
   const sellDex: DexId = uniSell.amountOut > sushiSell.amountOut ? 'Uniswap V3' : 'SushiSwap V2'
-  if (sellDex === buyDex) return null // best venue is the same on both legs — no cross-DEX edge
+  if (sellDex === buyDex) return null
 
   const quoteReceived = sellDex === 'Uniswap V3' ? uniSell.amountOut : sushiSell.amountOut
   const profitQuoteUnits = quoteReceived - quoteAmountIn
@@ -144,5 +140,36 @@ export async function findDexArbitrage(
     baseSymbol: base, quoteSymbol: quote, quoteAmountIn, baseAcquired,
     buyDex, sellDex, quoteReceived, profitQuoteUnits, profitPercentage,
     timestamp: Date.now(),
+  }
+}
+
+export type DexPriceSnapshot = {
+  base: string
+  quote: string
+  uniswapPrice: number | null
+  sushiswapPrice: number | null
+}
+
+// Direct spot-price read from each DEX for 1 unit of `base`, shown regardless
+// of whether an arbitrage opportunity exists — lets you see live quotes are
+// actually working instead of guessing from an empty opportunities list.
+export async function getDexPriceSnapshot(
+  base: keyof typeof MAINNET_TOKENS,
+  quote: keyof typeof MAINNET_TOKENS,
+): Promise<DexPriceSnapshot> {
+  const baseToken = MAINNET_TOKENS[base]
+  const quoteToken = MAINNET_TOKENS[quote]
+  const oneBase = 10n ** BigInt(baseToken.decimals)
+
+  const [uni, sushi] = await Promise.all([
+    getUniswapV3Quote(baseToken.address, quoteToken.address, oneBase),
+    getSushiswapQuote(baseToken.address, quoteToken.address, oneBase),
+  ])
+
+  return {
+    base,
+    quote,
+    uniswapPrice: uni ? Number(uni.amountOut) / 10 ** quoteToken.decimals : null,
+    sushiswapPrice: sushi ? Number(sushi.amountOut) / 10 ** quoteToken.decimals : null,
   }
 }

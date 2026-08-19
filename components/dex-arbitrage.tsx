@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createWalletClient, createPublicClient, custom, type Address } from 'viem'
 import { mainnet } from 'viem/chains'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, TrendingUp, ArrowRight, Loader, ShieldAlert } from 'lucide-react'
+import { AlertCircle, ArrowRight, Loader, ShieldAlert } from 'lucide-react'
 import { scanDexOpportunities, type DexScanResult } from '@/app/actions/dex-prices'
 import { getUniswapV3Quote, getSushiswapQuote, erc20Abi, swapRouter02Abi, sushiRouterAbi, type DexArbitrageResult, type DexId } from '@/lib/trading/dex-adapter'
 import { MAINNET_TOKENS, MAINNET_CHAIN_ID, UNISWAP_V3_SWAP_ROUTER_02, UNISWAP_V3_FEE_TIER, SUSHISWAP_V2_ROUTER } from '@/lib/trading/dex-tokens'
@@ -12,6 +12,28 @@ import { MAINNET_TOKENS, MAINNET_CHAIN_ID, UNISWAP_V3_SWAP_ROUTER_02, UNISWAP_V3
 type Step = 'idle' | 'scanning' | 'leg1-approve' | 'leg1-swap' | 'leg2-confirm' | 'leg2-approve' | 'leg2-swap' | 'done' | 'error'
 
 const routerFor = (dex: DexId) => dex === 'Uniswap V3' ? UNISWAP_V3_SWAP_ROUTER_02 : SUSHISWAP_V2_ROUTER
+
+const TOKEN_ICON_SLUG: Record<string, string> = { WETH: 'eth', WBTC: 'btc' }
+
+function TokenIcon({ symbol, size = 44 }: { symbol: string; size?: number }) {
+  const [failed, setFailed] = useState(false)
+  const slug = TOKEN_ICON_SLUG[symbol] ?? symbol.toLowerCase()
+  const iconUrl = `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1.x/128/color/${slug}.png`
+
+  if (failed) {
+    return (
+      <div
+        className="rounded-full flex items-center justify-center font-bold text-black bg-primary flex-shrink-0"
+        style={{ width: size, height: size }}
+      >
+        {symbol.slice(0, 1)}
+      </div>
+    )
+  }
+  return (
+    <img src={iconUrl} alt={symbol} width={size} height={size} className="rounded-full flex-shrink-0 bg-[#0a0a0a]" onError={() => setFailed(true)} />
+  )
+}
 
 export default function DexArbitrage() {
   const [opportunities, setOpportunities] = useState<DexArbitrageResult[]>([])
@@ -49,7 +71,7 @@ export default function DexArbitrage() {
     setError('')
     try {
       const result = await scanDexOpportunities(1000)
-      setOpportunities(result.opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage))
+      setOpportunities(result.opportunities)
       setSnapshots(result.snapshots)
       if (result.snapshots.every((s) => s.uniswapPrice === null && s.sushiswapPrice === null)) {
         setError('All quotes came back empty — the RPC endpoint is likely unreachable or rate-limited. Check server logs for "[dex]" errors, or set NEXT_PUBLIC_MAINNET_RPC_URL to a dedicated RPC (Alchemy/Infura free tier works well).')
@@ -186,50 +208,97 @@ export default function DexArbitrage() {
         Scan Uniswap V3 vs SushiSwap V2
       </Button>
 
-      {snapshots.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs font-bold text-muted-foreground tracking-widest">LIVE QUOTES</div>
-          {snapshots.map((s, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a] text-xs">
-              <span className="text-foreground font-medium">{s.base}/{s.quote}</span>
-              <span className={s.uniswapPrice === null ? 'text-red-400' : 'text-muted-foreground'}>
-                Uniswap: {s.uniswapPrice !== null ? s.uniswapPrice.toFixed(2) : 'failed'}
-              </span>
-              <span className={s.sushiswapPrice === null ? 'text-red-400' : 'text-muted-foreground'}>
-                SushiSwap: {s.sushiswapPrice !== null ? s.sushiswapPrice.toFixed(2) : 'failed'}
-              </span>
-            </div>
-          ))}
+      {error && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-300 flex gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
-      {opportunities.length === 0 && snapshots.length === 0 && step === 'idle' && (
+      {snapshots.length === 0 && step === 'idle' && (
         <p className="text-sm text-muted-foreground text-center">No scan run yet — click "Scan Uniswap V3 vs SushiSwap V2" above.</p>
       )}
-      {opportunities.length === 0 && snapshots.length > 0 && step === 'idle' && !error && (
-        <p className="text-sm text-muted-foreground text-center">Quotes are live (see above) but no cross-DEX price gap was found this scan.</p>
-      )}
 
+      {/* Unified price cards — every scanned pair, CEX-style */}
       <div className="space-y-3">
-        {opportunities.map((opp, i) => (
-          <div key={i} className="p-4 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a] flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-foreground">{opp.baseSymbol}/{opp.quoteSymbol}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                {opp.buyDex} <ArrowRight className="w-3 h-3" /> {opp.sellDex}
+        {snapshots.map((s, i) => {
+          const opp = opportunities.find((o) => o.baseSymbol === s.base && o.quoteSymbol === s.quote)
+          const bothPricesAvailable = s.uniswapPrice !== null && s.sushiswapPrice !== null
+
+          let buyDex: DexId | null = null, sellDex: DexId | null = null, spreadPercent = 0
+          if (bothPricesAvailable) {
+            const uniLower = s.uniswapPrice! <= s.sushiswapPrice!
+            buyDex = uniLower ? 'Uniswap V3' : 'SushiSwap V2'
+            sellDex = uniLower ? 'SushiSwap V2' : 'Uniswap V3'
+            const lower = Math.min(s.uniswapPrice!, s.sushiswapPrice!)
+            const higher = Math.max(s.uniswapPrice!, s.sushiswapPrice!)
+            spreadPercent = ((higher - lower) / lower) * 100
+          }
+
+          return (
+            <div key={i} className="rounded-xl border border-[#2a2a2a] bg-gradient-to-br from-[#1a1a1a] to-background overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-[#2a2a2a]">
+                <div className="flex items-center gap-3">
+                  <TokenIcon symbol={s.base} />
+                  <div>
+                    <div className="font-bold text-foreground">{s.base}</div>
+                    <div className="text-xs text-muted-foreground">{s.base}/{s.quote}</div>
+                  </div>
+                </div>
+                {bothPricesAvailable ? (
+                  <div className={`text-sm font-bold ${spreadPercent >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                    {spreadPercent.toFixed(2)}%
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-400 font-semibold">Quote unavailable</div>
+                )}
+              </div>
+
+              <div className="p-5 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[10px] text-muted-foreground tracking-widest mb-1">
+                    {bothPricesAvailable ? 'BUY FROM' : 'UNISWAP V3'}
+                  </div>
+                  <div className="font-bold text-foreground">{bothPricesAvailable ? buyDex : 'Uniswap V3'}</div>
+                  <div className={s.uniswapPrice === null ? 'text-red-400 text-sm' : 'text-primary font-semibold'}>
+                    {s.uniswapPrice !== null ? `$${s.uniswapPrice.toFixed(2)}` : 'failed'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-muted-foreground tracking-widest mb-1">
+                    {bothPricesAvailable ? 'SELL AT' : 'SUSHISWAP V2'}
+                  </div>
+                  <div className="font-bold text-foreground">{bothPricesAvailable ? sellDex : 'SushiSwap V2'}</div>
+                  <div className={s.sushiswapPrice === null ? 'text-red-400 text-sm' : 'text-primary font-semibold'}>
+                    {s.sushiswapPrice !== null ? `$${s.sushiswapPrice.toFixed(2)}` : 'failed'}
+                  </div>
+                </div>
+              </div>
+
+              {opp && (
+                <div className="px-5 pb-3">
+                  <div className="text-[10px] text-muted-foreground tracking-widest">NET PROFIT (before gas)</div>
+                  <div className={`text-3xl font-bold ${opp.profitPercentage >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                    {opp.profitPercentage.toFixed(2)}%
+                  </div>
+                </div>
+              )}
+
+              <div className="px-5 pb-5 flex items-center justify-between border-t border-[#2a2a2a] pt-4">
+                <div className="text-xs text-muted-foreground">
+                  {opp
+                    ? 'Real cross-DEX opportunity found this scan.'
+                    : bothPricesAvailable
+                      ? 'Both venues priced, but no genuine cross-DEX edge right now.'
+                      : 'One venue failed to quote — nothing tradeable here this scan.'}
+                </div>
+                <Button size="sm" disabled={!opp || !address || step !== 'idle'} onClick={() => opp && startExecution(opp)}>
+                  {opp ? 'Start Arbitrage' : 'No Opportunity'}
+                </Button>
               </div>
             </div>
-            <div className="text-right">
-              <div className={`text-lg font-bold ${opp.profitPercentage > 0 ? 'text-primary' : 'text-red-400'}`}>
-                {opp.profitPercentage.toFixed(2)}%
-              </div>
-              <div className="text-xs text-muted-foreground">before gas</div>
-            </div>
-            <Button size="sm" disabled={!address || step !== 'idle'} onClick={() => startExecution(opp)}>
-              Start
-            </Button>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {step === 'leg2-confirm' && selected && refreshedLeg2 && (
@@ -253,16 +322,8 @@ export default function DexArbitrage() {
         </div>
       )}
 
-      {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-300 flex gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
-
       {step === 'done' && (
         <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm text-primary flex gap-2">
-          <TrendingUp className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>Both legs executed. Check your wallet for the actual resulting balance.</span>
         </div>
       )}

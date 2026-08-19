@@ -5,7 +5,7 @@ import { createWalletClient, createPublicClient, custom, type Address } from 'vi
 import { mainnet } from 'viem/chains'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, TrendingUp, ArrowRight, Loader, ShieldAlert } from 'lucide-react'
-import { scanDexOpportunities } from '@/app/actions/dex-prices'
+import { scanDexOpportunities, type DexScanResult } from '@/app/actions/dex-prices'
 import { getUniswapV3Quote, getSushiswapQuote, erc20Abi, swapRouter02Abi, sushiRouterAbi, type DexArbitrageResult, type DexId } from '@/lib/trading/dex-adapter'
 import { MAINNET_TOKENS, MAINNET_CHAIN_ID, UNISWAP_V3_SWAP_ROUTER_02, UNISWAP_V3_FEE_TIER, SUSHISWAP_V2_ROUTER } from '@/lib/trading/dex-tokens'
 
@@ -15,6 +15,7 @@ const routerFor = (dex: DexId) => dex === 'Uniswap V3' ? UNISWAP_V3_SWAP_ROUTER_
 
 export default function DexArbitrage() {
   const [opportunities, setOpportunities] = useState<DexArbitrageResult[]>([])
+  const [snapshots, setSnapshots] = useState<DexScanResult['snapshots']>([])
   const [selected, setSelected] = useState<DexArbitrageResult | null>(null)
   const [address, setAddress] = useState<Address | null>(null)
   const [step, setStep] = useState<Step>('idle')
@@ -47,8 +48,12 @@ export default function DexArbitrage() {
     setStep('scanning')
     setError('')
     try {
-      const results = await scanDexOpportunities(1000)
-      setOpportunities(results.sort((a, b) => b.profitPercentage - a.profitPercentage))
+      const result = await scanDexOpportunities(1000)
+      setOpportunities(result.opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage))
+      setSnapshots(result.snapshots)
+      if (result.snapshots.every((s) => s.uniswapPrice === null && s.sushiswapPrice === null)) {
+        setError('All quotes came back empty — the RPC endpoint is likely unreachable or rate-limited. Check server logs for "[dex]" errors, or set NEXT_PUBLIC_MAINNET_RPC_URL to a dedicated RPC (Alchemy/Infura free tier works well).')
+      }
     } catch (err) {
       setError('Scan failed — RPC may be rate-limited, try again shortly.')
     } finally {
@@ -90,7 +95,7 @@ export default function DexArbitrage() {
     pushLog(`${dex} swap submitted (${hash.slice(0, 10)}...), waiting for confirmation...`)
     await publicClient.waitForTransactionReceipt({ hash })
     pushLog(`${dex} swap confirmed`)
-    return hash as unknown as bigint // receipt confirmed; exact output read via balance check below
+    return hash as unknown as bigint
   }
 
   const startExecution = async (opp: DexArbitrageResult) => {
@@ -102,19 +107,16 @@ export default function DexArbitrage() {
     const baseToken = MAINNET_TOKENS[opp.baseSymbol].address as Address
 
     try {
-      // Leg 1: buy base with quote on the cheaper DEX
       setStep('leg1-approve')
       await ensureAllowance(quoteToken, address, routerFor(opp.buyDex) as Address, opp.quoteAmountIn)
 
       setStep('leg1-swap')
-      const minBaseOut = (opp.baseAcquired * 99n) / 100n // 1% slippage tolerance
+      const minBaseOut = (opp.baseAcquired * 99n) / 100n
       await swapOn(opp.buyDex, quoteToken, baseToken, opp.quoteAmountIn, minBaseOut, address)
 
-      // Re-check actual base balance received (AMM output can differ slightly from quote)
       const { publicClient } = clients()
       const baseBalance = await publicClient.readContract({ address: baseToken, abi: erc20Abi, functionName: 'balanceOf', args: [address] })
 
-      // Mandatory checkpoint — price may have moved since the scan. Re-quote leg 2 and require explicit confirmation.
       setStep('leg2-confirm')
       const freshQuote = opp.sellDex === 'Uniswap V3'
         ? await getUniswapV3Quote(baseToken, quoteToken, baseBalance)
@@ -122,7 +124,6 @@ export default function DexArbitrage() {
       if (!freshQuote) throw new Error('Could not re-quote sell leg — aborting before leg 2.')
       const drift = ((Number(freshQuote.amountOut) - Number(opp.quoteReceived)) / Number(opp.quoteReceived)) * 100
       setRefreshedLeg2({ quoteReceived: freshQuote.amountOut, drift })
-      // execution pauses here until confirmLeg2() is called by the user
     } catch (err) {
       setError(`Leg 1 failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
       setStep('error')
@@ -185,8 +186,28 @@ export default function DexArbitrage() {
         Scan Uniswap V3 vs SushiSwap V2
       </Button>
 
-      {opportunities.length === 0 && step === 'idle' && (
-        <p className="text-sm text-muted-foreground text-center">No scan run yet, or no cross-DEX opportunities found.</p>
+      {snapshots.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-muted-foreground tracking-widest">LIVE QUOTES</div>
+          {snapshots.map((s, i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-[#0a0a0a] border border-[#2a2a2a] text-xs">
+              <span className="text-foreground font-medium">{s.base}/{s.quote}</span>
+              <span className={s.uniswapPrice === null ? 'text-red-400' : 'text-muted-foreground'}>
+                Uniswap: {s.uniswapPrice !== null ? s.uniswapPrice.toFixed(2) : 'failed'}
+              </span>
+              <span className={s.sushiswapPrice === null ? 'text-red-400' : 'text-muted-foreground'}>
+                SushiSwap: {s.sushiswapPrice !== null ? s.sushiswapPrice.toFixed(2) : 'failed'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {opportunities.length === 0 && snapshots.length === 0 && step === 'idle' && (
+        <p className="text-sm text-muted-foreground text-center">No scan run yet — click "Scan Uniswap V3 vs SushiSwap V2" above.</p>
+      )}
+      {opportunities.length === 0 && snapshots.length > 0 && step === 'idle' && !error && (
+        <p className="text-sm text-muted-foreground text-center">Quotes are live (see above) but no cross-DEX price gap was found this scan.</p>
       )}
 
       <div className="space-y-3">

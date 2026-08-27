@@ -17,9 +17,6 @@ export interface SwapPriceData {
   source: 'live-order-book'
 }
 
-// Wide, deliberately liquidity-agnostic token list — majors, mid-caps, and
-// memecoins. Thinner markets are included on purpose because they're more
-// likely to show real, larger spreads than heavily-arbitraged majors.
 const symbolMap: Record<string, string> = {
   BTC: 'BTC/USDT', ETH: 'ETH/USDT', SOL: 'SOL/USDT', XRP: 'XRP/USDT', ADA: 'ADA/USDT', DOGE: 'DOGE/USDT',
   ZEC: 'ZEC/USDT', CC: 'CC/USDT', RAIN: 'RAIN/USDT',
@@ -30,10 +27,6 @@ const symbolMap: Record<string, string> = {
   DEXE: 'DEXE/USDT',
 }
 
-// Widened on purpose to include smaller/less-arbitraged exchanges — liquidity
-// and exchange size are not filtered here per product requirements. This
-// means quoted spreads on thin pairs may not be fully fillable at size; see
-// the risk banner shown alongside these results in the UI.
 const PRICE_SOURCE_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin', 'htx', 'mexc']
 
 export async function fetchSwapPrices(token: string): Promise<SwapPriceData | null> {
@@ -68,16 +61,25 @@ export async function fetchSwapPrices(token: string): Promise<SwapPriceData | nu
   }
 }
 
+// Shared short-lived cache — concurrent visitors within this window get the
+// same already-computed scan instead of each triggering their own full pass
+// across every token and exchange.
+const SCAN_CACHE_TTL_MS = 20_000
+let scanCache: { data: SwapPriceData[]; cachedAt: number } | null = null
+
 export async function fetchAllTokenPrices() {
-  const tokens = Object.keys(symbolMap)
-  const results = await Promise.all(tokens.map(fetchSwapPrices))
-  return results.filter((result): result is SwapPriceData => result !== null)
+  return scanAllOpportunities()
 }
 
 export async function scanAllOpportunities() {
+  if (scanCache && Date.now() - scanCache.cachedAt < SCAN_CACHE_TTL_MS) {
+    return scanCache.data
+  }
   const tokens = Object.keys(symbolMap)
   const results = await Promise.all(tokens.map(fetchSwapPrices))
-  return results.filter((result): result is SwapPriceData => result !== null)
+  const data = results.filter((result): result is SwapPriceData => result !== null)
+  scanCache = { data, cachedAt: Date.now() }
+  return data
 }
 
 export async function fetchTokenQuotes(token: string) {

@@ -47,7 +47,46 @@ export function createExchange(exchangeId: string, credentials?: ExchangeCredent
   })
 }
 
+// Shared, public (no-credentials) exchange instances only — reused across
+// requests within the same warm function instance so loadMarkets() (which
+// downloads the exchange's entire pair catalog) doesn't run on every single
+// quote fetch. Never used for credentialed calls — those always get a fresh
+// instance scoped to that one request.
+const PUBLIC_MARKET_CACHE_TTL_MS = 10 * 60_000 // 10 minutes
+const publicExchangeCache = new Map<string, { exchange: Exchange; marketsLoadedAt: number }>()
+
+async function getPublicExchange(exchangeId: string): Promise<Exchange> {
+  const cached = publicExchangeCache.get(exchangeId)
+  const now = Date.now()
+  if (cached && now - cached.marketsLoadedAt < PUBLIC_MARKET_CACHE_TTL_MS) {
+    return cached.exchange
+  }
+  const exchange = cached?.exchange ?? createExchange(exchangeId)
+  await exchange.loadMarkets(true) // force refresh only when the cache is actually stale
+  publicExchangeCache.set(exchangeId, { exchange, marketsLoadedAt: now })
+  return exchange
+}
+
 export async function fetchQuote(exchangeId: string, symbol: string, credentials?: ExchangeCredentials): Promise<MarketQuote> {
+  // Public (scanning) path — reuse a cached, market-loaded instance.
+  if (!credentials) {
+    const exchange = await getPublicExchange(exchangeId)
+    const market = exchange.markets?.[symbol]
+    if (!market) throw new Error(`${symbol} is not available on ${exchangeId}`)
+    const ticker: Ticker = await exchange.fetchTicker(symbol)
+    if (!ticker.bid || !ticker.ask || ticker.bid <= 0 || ticker.ask <= 0) {
+      throw new Error(`No executable bid/ask for ${symbol} on ${exchangeId}`)
+    }
+    return {
+      exchangeId, symbol, bid: ticker.bid, ask: ticker.ask,
+      bidVolume: ticker.bidVolume ?? null, askVolume: ticker.askVolume ?? null,
+      quoteVolume24h: ticker.quoteVolume ?? null, timestamp: ticker.timestamp ?? Date.now(),
+      takerFee: market.taker ?? null,
+    }
+  }
+
+  // Credentialed path (execution, validation) — always fresh, never shared,
+  // never cached, since it's tied to one user's own API keys.
   const exchange = createExchange(exchangeId, credentials)
   try {
     await exchange.loadMarkets()
@@ -58,14 +97,9 @@ export async function fetchQuote(exchangeId: string, symbol: string, credentials
       throw new Error(`No executable bid/ask for ${symbol} on ${exchangeId}`)
     }
     return {
-      exchangeId,
-      symbol,
-      bid: ticker.bid,
-      ask: ticker.ask,
-      bidVolume: ticker.bidVolume ?? null,
-      askVolume: ticker.askVolume ?? null,
-      quoteVolume24h: ticker.quoteVolume ?? null,
-      timestamp: ticker.timestamp ?? Date.now(),
+      exchangeId, symbol, bid: ticker.bid, ask: ticker.ask,
+      bidVolume: ticker.bidVolume ?? null, askVolume: ticker.askVolume ?? null,
+      quoteVolume24h: ticker.quoteVolume ?? null, timestamp: ticker.timestamp ?? Date.now(),
       takerFee: market.taker ?? null,
     }
   } finally {
@@ -103,6 +137,21 @@ export async function placeLimitOrder(
   }
 }
 
+export async function placeMarketOrder(
+  exchangeId: string,
+  credentials: ExchangeCredentials,
+  symbol: string,
+  side: 'buy' | 'sell',
+  amount: number,
+): Promise<Order> {
+  const exchange = createExchange(exchangeId, credentials)
+  try {
+    return await exchange.createOrder(symbol, 'market', side, amount)
+  } finally {
+    await exchange.close()
+  }
+}
+
 export async function fetchOrder(exchangeId: string, credentials: ExchangeCredentials, orderId: string, symbol: string) {
   const exchange = createExchange(exchangeId, credentials)
   try {
@@ -116,21 +165,6 @@ export async function cancelOrder(exchangeId: string, credentials: ExchangeCrede
   const exchange = createExchange(exchangeId, credentials)
   try {
     return await exchange.cancelOrder(orderId, symbol)
-  } finally {
-    await exchange.close()
-  }
-}
-
-export async function placeMarketOrder(
-  exchangeId: string,
-  credentials: ExchangeCredentials,
-  symbol: string,
-  side: 'buy' | 'sell',
-  amount: number,
-): Promise<Order> {
-  const exchange = createExchange(exchangeId, credentials)
-  try {
-    return await exchange.createOrder(symbol, 'market', side, amount)
   } finally {
     await exchange.close()
   }

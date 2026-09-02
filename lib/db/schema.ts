@@ -54,39 +54,15 @@ export const verification = pgTable('verification', {
 })
 
 // --- App tables ------------------------------------------------------------
-// Add your app tables below. Always include a plain `userId` column so queries
-// can be scoped per user — the security model depends on this column existing,
-// not on a foreign key. Do NOT add a foreign key constraint
-// (`.references(() => user.id, ...)`) unless the user explicitly asks for
-// foreign keys or referential integrity; FK constraints make iterating on the
-// schema harder.
-//
-// Example:
-//
-// import { serial } from "drizzle-orm/pg-core"
-//
-// export const todos = pgTable("todos", {
-//   id: serial("id").primaryKey(),
-//   userId: text("userId").notNull(),
-//   title: text("title").notNull(),
-//   completed: boolean("completed").notNull().default(false),
-//   createdAt: timestamp("createdAt").notNull().defaultNow(),
-// })
-//
-// If the user asks for foreign keys, add the reference back in:
-//   userId: text("userId")
-//     .notNull()
-//     .references(() => user.id, { onDelete: "cascade" }),
 
-// Connected Wallets (EVM, Solana, Bitcoin)
 export const connectedWallets = pgTable(
   'connected_wallets',
   {
     id: text('id').primaryKey(),
     userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
-    chainType: text('chainType').notNull(), // 'EVM', 'Solana', 'Bitcoin'
+    chainType: text('chainType').notNull(),
     walletAddress: text('walletAddress').notNull(),
-    walletProvider: text('walletProvider').notNull(), // 'MetaMask', 'WalletConnect', 'Unisat', 'Phantom', etc.
+    walletProvider: text('walletProvider').notNull(),
     isActive: boolean('isActive').notNull().default(true),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
@@ -94,13 +70,12 @@ export const connectedWallets = pgTable(
   (t) => [uniqueIndex('connected_wallets_user_chain_address_idx').on(t.userId, t.chainType, t.walletAddress)]
 )
 
-// Transactions (Buy/Sell/Arbitrage trades)
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   walletId: text('walletId').notNull().references(() => connectedWallets.id, { onDelete: 'cascade' }),
-  transactionType: text('transactionType').notNull(), // 'buy', 'sell', 'arbitrage'
-  fromExchange: text('fromExchange'), // DEX or CEX name
+  transactionType: text('transactionType').notNull(),
+  fromExchange: text('fromExchange'),
   toExchange: text('toExchange'),
   tokenSymbol: text('tokenSymbol').notNull(),
   amount: numeric('amount').notNull(),
@@ -109,17 +84,16 @@ export const transactions = pgTable('transactions', {
   profit: numeric('profit'),
   gasFeesEstimate: numeric('gasFeesEstimate'),
   transactionHash: text('transactionHash'),
-  status: text('status').notNull().default('pending'), // 'pending', 'completed', 'failed'
+  status: text('status').notNull().default('pending'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
 
-// Price snapshots for arbitrage analysis
 export const priceSnapshots = pgTable('price_snapshots', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   tokenSymbol: text('tokenSymbol').notNull(),
-  exchange: text('exchange').notNull(), // DEX or CEX name
+  exchange: text('exchange').notNull(),
   price: numeric('price').notNull(),
   liquidity: numeric('liquidity'),
   volume24h: numeric('volume24h'),
@@ -168,10 +142,10 @@ export const botConfig = pgTable('bot_config', {
   userId: text('user_id').notNull().unique(),
   enabled: boolean('enabled').notNull().default(false),
   dryRun: boolean('dry_run').notNull().default(true),
-  symbols: text('symbols').notNull().default('BTC/USDT,ETH/USDT'), // comma-separated
+  symbols: text('symbols').notNull().default('BTC/USDT,ETH/USDT'),
   maxAmountPerTrade: numeric('max_amount_per_trade').notNull().default('0.01'),
   dailyLossCapUsd: numeric('daily_loss_cap_usd').notNull().default('50'),
-  minNetProfitBps: numeric('min_net_profit_bps').notNull().default('15'), // 0.15% minimum after fees
+  minNetProfitBps: numeric('min_net_profit_bps').notNull().default('15'),
   cooldownSeconds: numeric('cooldown_seconds').notNull().default('300'),
   candidateSymbols: text('candidate_symbols').notNull().default('BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,ADA/USDT,DOGE/USDT,ZEC/USDT,LTC/USDT,LINK/USDT,DOT/USDT,CC/USDT,RAIN/USDT'),
   exchangeScanCount: numeric('exchange_scan_count').notNull().default('5'),
@@ -180,6 +154,12 @@ export const botConfig = pgTable('bot_config', {
   maxTradesPerWindow: numeric('max_trades_per_window').notNull().default('5'),
   tradesThisWindow: numeric('trades_this_window').notNull().default('0'),
   currentWindowStartedAt: timestamp('current_window_started_at'),
+  sessionActive: boolean('session_active').notNull().default(false),
+  sessionStartedAt: timestamp('session_started_at'),
+  sessionDurationMinutes: numeric('session_duration_minutes').notNull().default('30'),
+  maxTradesPerSession: numeric('max_trades_per_session').notNull().default('10'),
+  tradesThisSession: numeric('trades_this_session').notNull().default('0'),
+  sessionStoppedReason: text('session_stopped_reason'),
   autoDisabledAt: timestamp('auto_disabled_at'),
   autoDisabledReason: text('auto_disabled_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -197,8 +177,8 @@ export const botTradeLog = pgTable('bot_trade_log', {
   sellPrice: numeric('sell_price').notNull(),
   netProfit: numeric('net_profit').notNull(),
   dryRun: boolean('dry_run').notNull(),
-  status: text('status').notNull(), // 'simulated' | 'executed' | 'failed' | 'skipped_cooldown' | 'no_opportunity'
-  strategy: text('strategy').notNull().default('arbitrage'), // 'arbitrage' | 'directional'
+  status: text('status').notNull(),
+  strategy: text('strategy').notNull().default('arbitrage'),
   error: text('error'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
@@ -239,9 +219,9 @@ export const botPositions = pgTable('bot_positions', {
   entryPrice: numeric('entry_price').notNull(),
   stopLossPrice: numeric('stop_loss_price').notNull(),
   takeProfitPrice: numeric('take_profit_price').notNull(),
-  status: text('status').notNull().default('open'), // 'open' | 'closed'
+  status: text('status').notNull().default('open'),
   exitPrice: numeric('exit_price'),
-  exitReason: text('exit_reason'), // 'take_profit' | 'stop_loss' | 'signal_reversal'
+  exitReason: text('exit_reason'),
   realizedPnl: numeric('realized_pnl'),
   dryRun: boolean('dry_run').notNull(),
   openedAt: timestamp('opened_at').notNull().defaultNow(),
@@ -251,19 +231,11 @@ export const botPositions = pgTable('bot_positions', {
 export const userApproval = pgTable('user_approval', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().unique(),
-  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  status: text('status').notNull().default('pending'),
   reviewedBy: text('reviewed_by'),
   reviewedAt: timestamp('reviewed_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
-
-// Additional botConfig columns (merge into the existing botConfig table):
-//   sessionActive: boolean('session_active').notNull().default(false),
-//   sessionStartedAt: timestamp('session_started_at'),
-//   sessionDurationMinutes: numeric('session_duration_minutes').notNull().default('30'),
-//   maxTradesPerSession: numeric('max_trades_per_session').notNull().default('10'),
-//   tradesThisSession: numeric('trades_this_session').notNull().default('0'),
-//   sessionStoppedReason: text('session_stopped_reason'),
 
 export const scheduledOrders = pgTable('scheduled_orders', {
   id: text('id').primaryKey(),
@@ -271,15 +243,36 @@ export const scheduledOrders = pgTable('scheduled_orders', {
   credentialId: text('credential_id').notNull(),
   exchangeId: text('exchange_id').notNull(),
   symbol: text('symbol').notNull(),
-  side: text('side').notNull(), // 'buy' | 'sell'
+  side: text('side').notNull(),
   amount: numeric('amount').notNull(),
-  triggerType: text('trigger_type').notNull(), // 'price' | 'time'
+  triggerType: text('trigger_type').notNull(),
   triggerPrice: numeric('trigger_price'),
   triggerAt: timestamp('trigger_at'),
-  status: text('status').notNull().default('pending'), // 'pending' | 'executed' | 'cancelled' | 'failed'
+  status: text('status').notNull().default('pending'),
   exchangeOrderId: text('exchange_order_id'),
   filledPrice: numeric('filled_price'),
   error: text('error'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   executedAt: timestamp('executed_at'),
+})
+
+export const userBalance = pgTable('user_balance', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  balance: numeric('balance').notNull().default('0'),
+  currency: text('currency').notNull().default('GHS'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const paymentTransactions = pgTable('payment_transactions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  provider: text('provider').notNull(),
+  externalReference: text('external_reference').notNull().unique(),
+  amount: numeric('amount').notNull(),
+  currency: text('currency').notNull(),
+  status: text('status').notNull().default('pending'),
+  rawPayload: text('raw_payload'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
 })

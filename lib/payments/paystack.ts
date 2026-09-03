@@ -42,4 +42,4 @@ export function verifyPaystackSignature(rawBody: string, signature: string | nul
   if (!signature) return false
   const computed = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY!).update(rawBody).digest('hex')
   return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(signature))
-}payments/paystack.ts
+}

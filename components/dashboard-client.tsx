@@ -15,7 +15,7 @@ import ExchangeCredentials from './exchange-credentials'
 import BotControlPanel from './bot-control-panel'
 import DepositFunds from './deposit-funds'
 import { Button } from '@/components/ui/button'
-import { LogOut } from 'lucide-react'
+import { LogOut, Wallet as WalletIcon } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
 
@@ -91,15 +91,25 @@ export default function DashboardClient({ user }: { user: User }) {
               <div className="text-xs text-muted-foreground">{user.email}</div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-muted-foreground hover:text-primary"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-xs">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setActiveTab('deposit')}
+              className="flex items-center gap-2"
+            >
+              <WalletIcon className="w-4 h-4" />
+              <span className="text-xs">Deposit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-muted-foreground hover:text-primary"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-xs">Logout</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -198,6 +208,15 @@ export default function DashboardClient({ user }: { user: User }) {
                 <h2 className="text-3xl font-bold mb-6 text-foreground">Quick <span className="text-primary">Actions</span></h2>
                 <div className="space-y-3">
                   <WalletConnector onWalletAdded={() => {}} />
+                  <Button
+                    onClick={() => setActiveTab('deposit')}
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    <WalletIcon className="w-4 h-4" />
+                    Deposit Funds
+                  </Button>
                 </div>
               </div>
             </div>

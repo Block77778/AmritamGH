@@ -13,6 +13,7 @@ import ArbitrageOpportunities from './arbitrage-opportunities'
 import DexArbitrage from './dex-arbitrage'
 import ExchangeCredentials from './exchange-credentials'
 import BotControlPanel from './bot-control-panel'
+import DepositFunds from './deposit-funds'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
@@ -35,7 +36,6 @@ export default function DashboardClient({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [arbMode, setArbMode] = useState<'cex' | 'dex'>('cex')
 
-  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -60,7 +60,6 @@ export default function DashboardClient({ user }: { user: User }) {
     loadData()
   }, [selectedToken])
 
-  // Refresh prices periodically
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -69,7 +68,7 @@ export default function DashboardClient({ user }: { user: User }) {
       } catch (error) {
         console.error('Error refreshing prices:', error)
       }
-    }, 30000) // Refresh every 30 seconds
+    }, 30000)
 
     return () => clearInterval(interval)
   }, [selectedToken])
@@ -83,7 +82,6 @@ export default function DashboardClient({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="fixed top-0 w-full z-50 border-b border-[#1a1a1a] bg-background/80 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -105,12 +103,9 @@ export default function DashboardClient({ user }: { user: User }) {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="pt-20 px-4 sm:px-6 lg:px-8 pb-8">
-        {/* Stats Overview */}
         <div className="max-w-7xl mx-auto mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Connected Wallets Card */}
             <div className="group relative p-8 rounded-xl bg-gradient-to-br from-[#1a1a1a] to-background border border-[#2a2a2a] hover:border-primary/50 transition-all duration-300 overflow-hidden shadow-lg hover:shadow-primary/10">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               <div className="relative">
@@ -122,7 +117,6 @@ export default function DashboardClient({ user }: { user: User }) {
               </div>
             </div>
 
-            {/* Active Trades Card */}
             <div className="group relative p-8 rounded-xl bg-gradient-to-br from-[#1a1a1a] to-background border border-[#2a2a2a] hover:border-primary/50 transition-all duration-300 overflow-hidden shadow-lg hover:shadow-primary/10">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               <div className="relative">
@@ -136,7 +130,6 @@ export default function DashboardClient({ user }: { user: User }) {
               </div>
             </div>
 
-            {/* Best Arbitrage Card */}
             <div className="group relative p-8 rounded-xl bg-gradient-to-br from-[#1a1a1a] to-background border border-[#2a2a2a] hover:border-primary/50 transition-all duration-300 overflow-hidden shadow-lg hover:shadow-primary/10">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               <div className="relative">
@@ -152,14 +145,13 @@ export default function DashboardClient({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="max-w-7xl mx-auto mb-8">
-          <div className="flex gap-8 border-b border-[#2a2a2a]">
-            {['overview', 'wallets', 'prices', 'history', 'exchanges', 'bot'].map((tab) => (
+          <div className="flex gap-8 border-b border-[#2a2a2a] overflow-x-auto">
+            {['overview', 'wallets', 'prices', 'history', 'exchanges', 'bot', 'deposit'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-1 py-3 text-xs font-bold tracking-widest capitalize transition-colors border-b-2 ${
+                className={`px-1 py-3 text-xs font-bold tracking-widest capitalize transition-colors border-b-2 whitespace-nowrap ${
                   activeTab === tab
                     ? 'text-primary border-b-primary'
                     : 'text-muted-foreground border-b-transparent hover:text-foreground'
@@ -171,7 +163,6 @@ export default function DashboardClient({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* Tab Content */}
         <div className="max-w-7xl mx-auto">
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -277,6 +268,13 @@ export default function DashboardClient({ user }: { user: User }) {
             <div>
               <h2 className="text-3xl font-bold mb-6 text-foreground">Trading <span className="text-primary">Bot</span></h2>
               <BotControlPanel />
+            </div>
+          )}
+
+          {activeTab === 'deposit' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-foreground">Deposit <span className="text-primary">Funds</span></h2>
+              <DepositFunds />
             </div>
           )}
         </div>

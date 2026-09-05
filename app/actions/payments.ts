@@ -19,10 +19,12 @@ function getSiteUrl() {
   return process.env.BETTER_AUTH_URL || `https://${process.env.VERCEL_URL}`
 }
 
-export async function getBalance() {
+export async function getBalances() {
   const user = await getUser()
-  const rows = await db.select().from(userBalance).where(eq(userBalance.userId, user.id)).limit(1)
-  return rows[0] ?? { balance: '0', currency: process.env.PLATFORM_CURRENCY || 'GHS' }
+  const rows = await db.select().from(userBalance).where(eq(userBalance.userId, user.id))
+  const ghs = rows.find((r) => r.currency === 'GHS') ?? { balance: '0', currency: 'GHS' }
+  const usd = rows.find((r) => r.currency === 'USD') ?? { balance: '0', currency: 'USD' }
+  return { ghs, usd }
 }
 
 export async function getTransactionHistory() {
@@ -30,10 +32,11 @@ export async function getTransactionHistory() {
   return db.select().from(paymentTransactions).where(eq(paymentTransactions.userId, user.id)).orderBy(paymentTransactions.createdAt)
 }
 
+// Paystack — GHS (confirmed working on your account)
 export async function depositWithPaystack(amountMajorUnits: number) {
   const user = await getUser()
   if (amountMajorUnits <= 0) throw new Error('Enter a valid amount')
-  const currency = process.env.PLATFORM_CURRENCY || 'GHS'
+  const currency = 'GHS'
   const reference = `paystack_${nanoid(16)}`
 
   await db.insert(paymentTransactions).values({
@@ -48,10 +51,12 @@ export async function depositWithPaystack(amountMajorUnits: number) {
   return { redirectUrl: authorizationUrl }
 }
 
+// NOWPayments — USD (GHS is not in NOWPayments' supported base-currency list,
+// so this is intentionally a separate USD balance, not converted into GHS)
 export async function depositWithNowPayments(amountMajorUnits: number) {
   const user = await getUser()
   if (amountMajorUnits <= 0) throw new Error('Enter a valid amount')
-  const currency = process.env.PLATFORM_CURRENCY || 'GHS'
+  const currency = 'USD'
   const orderId = `nowpayments_${nanoid(16)}`
 
   await db.insert(paymentTransactions).values({

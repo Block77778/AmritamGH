@@ -2,31 +2,42 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { getBalance, getTransactionHistory, depositWithPaystack, depositWithNowPayments } from '@/app/actions/payments'
+import { getBalances, getTransactionHistory, depositWithPaystack, depositWithNowPayments } from '@/app/actions/payments'
 import { CreditCard, Coins, Loader } from 'lucide-react'
 
 export default function DepositFunds() {
-  const [balance, setBalance] = useState<any>(null)
+  const [balances, setBalances] = useState<{ ghs: any; usd: any } | null>(null)
   const [history, setHistory] = useState<any[]>([])
-  const [amount, setAmount] = useState('50')
+  const [ghsAmount, setGhsAmount] = useState('50')
+  const [usdAmount, setUsdAmount] = useState('10')
   const [loadingProvider, setLoadingProvider] = useState<'paystack' | 'nowpayments' | null>(null)
   const [error, setError] = useState('')
 
   const load = async () => {
-    const [bal, tx] = await Promise.all([getBalance(), getTransactionHistory()])
-    setBalance(bal)
+    const [bal, tx] = await Promise.all([getBalances(), getTransactionHistory()])
+    setBalances(bal)
     setHistory(tx)
   }
 
   useEffect(() => { load() }, [])
 
-  const handleDeposit = async (provider: 'paystack' | 'nowpayments') => {
+  const handlePaystack = async () => {
     setError('')
-    setLoadingProvider(provider)
+    setLoadingProvider('paystack')
     try {
-      const { redirectUrl } = provider === 'paystack'
-        ? await depositWithPaystack(parseFloat(amount))
-        : await depositWithNowPayments(parseFloat(amount))
+      const { redirectUrl } = await depositWithPaystack(parseFloat(ghsAmount))
+      window.location.href = redirectUrl
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start deposit')
+      setLoadingProvider(null)
+    }
+  }
+
+  const handleNowPayments = async () => {
+    setError('')
+    setLoadingProvider('nowpayments')
+    try {
+      const { redirectUrl } = await depositWithNowPayments(parseFloat(usdAmount))
       window.location.href = redirectUrl
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start deposit')
@@ -36,29 +47,47 @@ export default function DepositFunds() {
 
   return (
     <div className="space-y-6">
-      <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a]">
-        <div className="text-xs text-muted-foreground tracking-widest mb-1">CURRENT BALANCE</div>
-        <div className="text-4xl font-bold text-primary">
-          {balance ? `${balance.currency} ${Number(balance.balance).toFixed(2)}` : '...'}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a]">
+          <div className="text-xs text-muted-foreground tracking-widest mb-1">GHS BALANCE</div>
+          <div className="text-3xl font-bold text-primary">
+            {balances ? `GHS ${Number(balances.ghs.balance).toFixed(2)}` : '...'}
+          </div>
+        </div>
+        <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a]">
+          <div className="text-xs text-muted-foreground tracking-widest mb-1">USD BALANCE</div>
+          <div className="text-3xl font-bold text-primary">
+            {balances ? `$${Number(balances.usd.balance).toFixed(2)}` : '...'}
+          </div>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground text-center -mt-2">
+        These are separate balances, not automatically converted between each other.
+      </p>
 
-      <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a] space-y-4">
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Amount ({balance?.currency || 'GHS'})</label>
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} min="1"
-            className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground" />
+      {error && <div className="text-sm text-red-400 bg-red-500/10 p-2 rounded">{error}</div>}
+
+      <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a] space-y-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <CreditCard className="w-4 h-4 text-primary" /> Card / Mobile Money (Paystack) — GHS
         </div>
-
-        {error && <div className="text-sm text-red-400 bg-red-500/10 p-2 rounded">{error}</div>}
-
-        <Button onClick={() => handleDeposit('paystack')} disabled={loadingProvider !== null} className="w-full flex items-center justify-center gap-2">
-          {loadingProvider === 'paystack' ? <Loader className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-          Pay with Card / Mobile Money (Paystack)
+        <input type="number" value={ghsAmount} onChange={(e) => setGhsAmount(e.target.value)} min="1"
+          className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground" />
+        <Button onClick={handlePaystack} disabled={loadingProvider !== null} className="w-full flex items-center justify-center gap-2">
+          {loadingProvider === 'paystack' ? <Loader className="w-4 h-4 animate-spin" /> : null}
+          Deposit GHS {ghsAmount || '0'}
         </Button>
-        <Button onClick={() => handleDeposit('nowpayments')} disabled={loadingProvider !== null} variant="outline" className="w-full flex items-center justify-center gap-2">
-          {loadingProvider === 'nowpayments' ? <Loader className="w-4 h-4 animate-spin" /> : <Coins className="w-4 h-4" />}
-          Pay with Crypto (NOWPayments)
+      </div>
+
+      <div className="p-6 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a] space-y-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Coins className="w-4 h-4 text-primary" /> Crypto (NOWPayments) — USD
+        </div>
+        <input type="number" value={usdAmount} onChange={(e) => setUsdAmount(e.target.value)} min="1"
+          className="w-full p-2 rounded bg-background border border-[#2a2a2a] text-sm text-foreground" />
+        <Button onClick={handleNowPayments} disabled={loadingProvider !== null} variant="outline" className="w-full flex items-center justify-center gap-2">
+          {loadingProvider === 'nowpayments' ? <Loader className="w-4 h-4 animate-spin" /> : null}
+          Deposit ${usdAmount || '0'}
         </Button>
       </div>
 

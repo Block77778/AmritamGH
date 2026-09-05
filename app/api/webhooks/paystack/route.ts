@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
-import { nanoid } from 'nanoid'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { paymentTransactions, userBalance } from '@/lib/db/schema'
+import { paymentTransactions } from '@/lib/db/schema'
 import { verifyPaystackSignature } from '@/lib/payments/paystack'
+import { creditBalance } from '@/lib/payments/balance'
 
 export async function POST(request: Request) {
   const rawBody = await request.text()
@@ -26,13 +26,7 @@ export async function POST(request: Request) {
   }
 
   await db.update(paymentTransactions).set({ status: 'success', rawPayload: rawBody, completedAt: new Date() }).where(eq(paymentTransactions.id, tx.id))
-
-  const existing = await db.select().from(userBalance).where(eq(userBalance.userId, tx.userId)).limit(1)
-  if (existing[0]) {
-    await db.update(userBalance).set({ balance: sql`${userBalance.balance} + ${tx.amount}`, updatedAt: new Date() }).where(eq(userBalance.userId, tx.userId))
-  } else {
-    await db.insert(userBalance).values({ id: nanoid(), userId: tx.userId, balance: tx.amount, currency: tx.currency })
-  }
+  await creditBalance(tx.userId, tx.currency, tx.amount)
 
   return NextResponse.json({ received: true })
 }
